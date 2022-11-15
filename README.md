@@ -1,5 +1,5 @@
 # XF-OPT/META
-## E**X**perimentation **F**ramework and (Hyper-)Parameter **Opt**imization for **Meta**heuristic
+## E**X**perimentation **F**ramework and (Hyper-)Parameter **Opt**imization for **Meta**heuristics
 
 This python package provides and easy-to-use and modular framework for implementing metaheuristic algorithms and corresponding problems (e.g., TSP, QAP). Futhermore it provides functions/modes for optimizing the paramters used in the metaheuristics using Hyperparamter optimization algorithms (e.g., Random Search), analyzing multiple runs of an implemented metaheurisitc algorithm or simply running said algorithm interactively.
 
