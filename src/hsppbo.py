@@ -7,6 +7,7 @@ from sce_tree import SCETree
 from problem import Problem
 from logger import Logger
 from functools import partial
+from config import params
 
 
 class HSPPBO:
@@ -58,14 +59,15 @@ class HSPPBO:
     def execute_wrapper(self, *args) -> int:
         """
         Args:
-            kwargs (bool, optional): 
+            *args (optional): 
 
         Returns:
-            tuple[list, int]: Best solution (tuple of path and length) found during the runtime of the algorithm.  
+            int: Best solution (tuple of path and length) found during the runtime of the algorithm.  
         """
-        self.alpha = args[0][0]
-        self.beta = args[0][1]
 
+        for k, v in enumerate(args[0]):
+            self.__dict__[params['hsppbo'][k][0]] = v
+            
         self.tree.reset()
         i = self.execute()[1]
         return i
@@ -110,8 +112,9 @@ class HSPPBO:
             else:
                 # NON-MULTITHREADED VERSION
                 for sce in range(0, self.sce_count):
-                    solution = self.construct_solution(sce,i)[1]
-                    solution_quality = self.problem.get_solution_quality(solution)
+                    solution = self.construct_solution(sce, i)[1]
+                    solution_quality = self.problem.get_solution_quality(
+                        solution)
                     self.tree.update_node(sce, solution, solution_quality)
 
             swap_count = 0  # number of swaps performed in the SCE tree

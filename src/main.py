@@ -3,13 +3,15 @@ from hsppbo import HSPPBO
 from logger import Logger
 from optimizer import Optimizer
 from tsp import TSP
+from config import params
 import timeit
 
 
 def user_input():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', help="Turn on output verbosity", action='store_true')
+    parser.add_argument('-v', '--verbose',
+                        help="Turn on output verbosity", action='store_true')
     parser.add_argument('-m', '--mode', type=str, choices=[
                         'run', 'optimize', 'experiment'], default='run', help='Mode of execution for the given problem and/or algorithm')
     parser.add_argument('-p', '--problem', type=str, default='rat195',
@@ -87,7 +89,7 @@ def main():
             pass
         case 'optimize':
             hsppbo.set_random_seed()
-            opt = Optimizer("bayesian", hsppbo.execute_wrapper)
+            opt = Optimizer("bayesian", hsppbo.execute_wrapper, params['hsppbo'])
             opt.run(verbose=args.verbose)
 
 
