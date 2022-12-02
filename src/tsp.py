@@ -148,6 +148,24 @@ class TSP(Problem):
         except:
             return None
 
+    def get_average_distance(self) -> float:
+        """
+        Calculate the average distance of the tsp paths via the distance matrix
+
+        Returns:
+            float: average distance between nodes
+        """
+        return np.average(self.distance_matrix)
+
+    def get_median_distance(self) -> float:
+        """
+        Calculate the median distance of the tsp paths via the distance matrix
+
+        Returns:
+            float: median distance between nodes
+        """
+        return np.median(self.distance_matrix)
+
     def swap_nodes(self, node_1: int, node_2: int):
         """
         Swap two given node indices in the problem instance

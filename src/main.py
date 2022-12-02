@@ -89,8 +89,8 @@ def main():
             pass
         case 'optimize':
             hsppbo.set_random_seed()
-            opt = Optimizer("bayesian", hsppbo.execute_wrapper, params['hsppbo'])
-            opt.run(verbose=args.verbose)
+            opt = Optimizer("gradient", hsppbo.execute_wrapper, params['hsppbo'])
+            opt.run(verbose=args.verbose, n_calls=10)
 
 
 if __name__ == '__main__':

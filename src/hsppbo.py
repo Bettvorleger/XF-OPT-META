@@ -17,7 +17,7 @@ class HSPPBO:
     # min number of iterations between change handling procedures (variable L in literaute)
     CHANGE_PAUSE = 5
 
-    def __init__(self, problem: Problem, logger: Logger, pers_best=0.075, pers_prev=0.075, parent_best=0.01, alpha=1, beta=7, detection_threshold=0.25, reaction_type='partly') -> None:
+    def __init__(self, problem: Problem, logger: Logger, pers_best=0.075, pers_prev=0.075, parent_best=0.01, alpha=1, beta=9, detection_threshold=0.25, reaction_type='partly') -> None:
         """
         Initialize the hsppbo algorithm with the given parameters.
 

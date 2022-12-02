@@ -55,11 +55,11 @@ class Logger():
 
     def create_info_log(self, params):
         io_file = self.create_file_wrapper("info.log")
-
         for k, v in params.items():
             if k in ("logger", "rng"):
                 continue
             io_file.write(k+": "+str(v)+"\n")
+        io_file.close()
 
     def create_run_log_header(self):
         self.run_io.write(
