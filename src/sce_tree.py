@@ -252,6 +252,19 @@ class SCETree:
         """
         return list(self.tree.expand_tree(mode=Tree.WIDTH))
 
+    def get_info(self) -> dict:
+        """
+        Get information about the current SCE tree as a dict
+
+        Returns:
+            dict: Information about the SCE tree
+        """
+
+        return {
+            "num_sce_nodes": self.nodes,
+            "child_per_node": self.childs
+        }
+
     def __str__(self) -> str:
         return "\nSCE Nodes: %s, Childs per Node: %s\n" % (self.nodes, self.childs)
 

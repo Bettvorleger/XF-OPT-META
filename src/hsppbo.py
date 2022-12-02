@@ -67,7 +67,7 @@ class HSPPBO:
 
         for k, v in enumerate(args[0]):
             self.__dict__[params['hsppbo'][k][0]] = v
-            
+
         self.tree.reset()
         i = self.execute()[1]
         return i
@@ -83,7 +83,6 @@ class HSPPBO:
             tuple[list, int]: Best solution (tuple of path and length) found during the runtime of the algorithm.       
         """
         self.tree.init_tree()
-        self.logger.create_info_log(self.__dict__)
         change_pause_count = self.CHANGE_PAUSE
 
         for i in range(0, self.max_iteration_count):
@@ -238,3 +237,26 @@ class HSPPBO:
             return solution.get(subset[0]) + 1 == solution.get(subset[1])
         except:
             return False
+
+    def get_info(self) -> dict:
+        """
+        Get information about the hsppbo parameters and its problem instace and SCE tree
+
+        Returns:
+            dict: info about the current hsppbo run
+        """
+        return {
+            'hsppbo': {
+                'w_pers_best': self.w_pers_best,
+                'w_pers_prev': self.w_pers_prev,
+                'w_parent_best': self.w_parent_best,
+                'w_rand': self.w_rand,
+                'alpha': self.alpha,
+                'beta': self.beta,
+                'detection_threshold': self.detection_threshold,
+                'reaction_type': self.reaction_type,
+                'fixed_rng': self.fixed_rng
+            },
+            'tree': self.tree.get_info(),
+            'problem': self.problem.get_info()
+        }

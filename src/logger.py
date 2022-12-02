@@ -1,4 +1,5 @@
 import timeit
+import json
 from pathlib import Path
 from re import findall
 
@@ -54,11 +55,13 @@ class Logger():
         return open("".join((self.path, self.path_prefix[self.mode], str(self.suffix_number), "/", filename)), "a")
 
     def create_info_log(self, params):
-        io_file = self.create_file_wrapper("info.log")
-        for k, v in params.items():
-            if k in ("logger", "rng"):
-                continue
-            io_file.write(k+": "+str(v)+"\n")
+        io_file = self.create_file_wrapper("info.json")
+        io_file.write(json.dumps(params, indent=4, default=str))
+        io_file.close()
+
+    def create_opt_log(self, opt_results):
+        io_file = self.create_file_wrapper("opt_log.json")
+        io_file.write(json.dumps(opt_results, indent=4, default=str))
         io_file.close()
 
     def create_run_log_header(self):
@@ -85,3 +88,5 @@ class Logger():
         io_file = self.create_file_wrapper("results.csv")
         #rpd_list = [((x[4] - optimal_solution) / optimal_solution) for x in self.log_list]
         #time_list =  [x[1] for x in self.log_list]
+
+    

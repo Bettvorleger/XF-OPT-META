@@ -141,7 +141,7 @@ class TSP(Problem):
         return self.recipr_dist_matrix[i][j]
 
     def get_optimal_solution(self) -> float:
-        try: 
+        try:
             with open(self.problem_path+'../optimal.json', 'r') as f:
                 optimal = json.load(f)
                 return optimal["tsp"]["tsplib"]["stsp"][self.instance.name]
@@ -238,6 +238,28 @@ class TSP(Problem):
     def dimension(self, value):
         self._dimension = value
 
+    def get_info(self) -> dict:
+        """
+        Get information about the current TSP instance as a dict
+
+        Returns:
+            dict: Information about the TSP instance
+        """
+        dynamic_props = {}
+        if self.dynamic:
+            dynamic_props = {
+                "dynamic_frequency": self.dynamic_frequency,
+                "dynamic_intensity": self.dynamic_intensity,
+                "min_iterations_before_dynamic": self.min_iteration_count
+            }
+        return {
+            "type": "stsp",
+            "name": self.instance.name,
+            "dimension": self.dimension,
+            "weight_type": self.instance.edge_weight_type,
+            "dynamic_props": dynamic_props
+        }
+    
     def __str__(self) -> str:
         dynamic_props = ""
         if self.dynamic:

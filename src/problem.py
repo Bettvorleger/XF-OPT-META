@@ -64,6 +64,16 @@ class Problem(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_info(self) -> dict:
+        """
+        Get information about the current problem instance as a dict
+
+        Returns:
+            dict: Information about the TSP instance
+        """
+        pass
+
     @property
     @abstractmethod
     def dimension(self):
@@ -72,6 +82,8 @@ class Problem(ABC):
     @dimension.setter
     def dimension(self, value):
         self.dimension = value
+        
+
 
     
 

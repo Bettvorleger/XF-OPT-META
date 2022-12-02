@@ -76,6 +76,8 @@ def main():
     hsppbo = HSPPBO(problem, logger, args.personal_best, args.personal_previous, args.parent_best,
                     args.alpha, args.beta, args.dynamic_detection_threshold, args.reaction_type)
 
+    logger.create_info_log(hsppbo.get_info())
+
     match args.mode:
         case 'run':
             starttime = timeit.default_timer()
@@ -89,8 +91,10 @@ def main():
             pass
         case 'optimize':
             hsppbo.set_random_seed()
-            opt = Optimizer("gradient", hsppbo.execute_wrapper, params['hsppbo'])
-            opt.run(verbose=args.verbose, n_calls=10)
+            opt = Optimizer("bayesian", hsppbo.execute_wrapper,
+                            params['hsppbo'])
+            opt_res = opt.run(verbose=args.verbose, n_calls=1)
+            logger.create_opt_log(opt_res)
 
 
 if __name__ == '__main__':
