@@ -52,6 +52,14 @@ def check_percent_range(number: float) -> float:
 
     return number
 
+# TODO:
+#   - implement all logging cases (run: completed, opt: needs better tracking per execution, exp: needs everything)
+#   - logging: include info about problem instace (via median and average) - used for AI training
+#   - logging: experimentation: being able to enter number of runs, and analyzing them afterwards
+#   - implement tests
+#   - research sensible parameter boundaries for optimization
+#   - web UI (flask) and better packaging
+
 
 def main():
     args = user_input()
@@ -60,8 +68,10 @@ def main():
             logger = Logger(mode='run')
         case 'experiment':
             logger = Logger(mode='exp')
+            runs = get_run_number()
         case 'optimize':
             logger = Logger(mode='opt')
+            runs = get_run_number()
 
     if (args.problem_type == 'TSP'):
         problem = TSP(tsplib_name=args.problem)
@@ -93,8 +103,21 @@ def main():
             hsppbo.set_random_seed()
             opt = Optimizer("bayesian", hsppbo.execute_wrapper,
                             params['hsppbo'])
-            opt_res = opt.run(verbose=args.verbose, n_calls=1)
-            logger.create_opt_log(opt_res)
+            for i in range(1,runs+1):
+                print("---STARTING OPTIMIZATION RUN " + str(i) + "/" + str(runs) + "---")
+                opt_res = opt.run(verbose=args.verbose, n_calls=2, random_state=i)
+                logger.create_opt_log(opt_res, params['hsppbo'], run=i)
+
+
+def get_run_number() -> None:
+    print('Do you want to perform multiple runs? [Y/N]')
+    x = input()
+    if x.lower() == 'y' or x.lower() == 'yes':
+        print('How many runs do you want to execute? (max. 30)')
+        runs = input()
+        if 0 < int(runs) <= 30: 
+            return int(runs)
+    return 1
 
 
 if __name__ == '__main__':

@@ -2,20 +2,41 @@ import timeit
 import json
 from pathlib import Path
 from re import findall
+from config import params
 
 
 class Logger():
-    def __init__(self, path="output/", mode="run", suffix_number=0) -> None:
+    MODE_RUN = "run"
+    MODE_EXPERIMENT = "exp"
+    MODE_OPTIMIZE = "opt"
+
+    def __init__(self, path="output/", mode=MODE_RUN, suffix_number=0) -> None:
         self.path = path
         self.mode = mode
-        self.path_prefix = {"run": "run_", "exp": "exp_", "opt": "opt_"}
+        modes = {
+            self.MODE_RUN: self.run,
+            self.MODE_EXPERIMENT: self.experiment,
+            self.MODE_OPTIMIZE: self.optimize
+        }
+        self.path_prefix = {self.MODE_RUN: "run_",
+                            self.MODE_EXPERIMENT: "exp_", self.MODE_OPTIMIZE: "opt_"}
         self.suffix_number = suffix_number
         if (suffix_number == 0):
             self.suffix_number = self.init_folder()
-        self.log_list = []
+
+        modes[self.mode]
+
+    def run(self):
         self.run_io = self.create_file_wrapper("run.csv")
         self.create_run_log_header()
         self.starttime = timeit.default_timer()
+        self.log_list = []
+
+    def experiment(self):
+        pass
+
+    def optimize(self):
+        pass
 
     def init_folder(self) -> int:
         """
@@ -59,14 +80,30 @@ class Logger():
         io_file.write(json.dumps(params, indent=4, default=str))
         io_file.close()
 
-    def create_opt_log(self, opt_results):
-        io_file = self.create_file_wrapper("opt_log.json")
+    def create_opt_log(self, opt_results, params, run=1):
+        # dump out all the data from the optimizer run
+        io_file = self.create_file_wrapper("opt_log_"+str(run)+".json")
         io_file.write(json.dumps(opt_results, indent=4, default=str))
+        io_file.close()
+
+        io_file = self.create_file_wrapper("opt_run_"+str(run)+".csv")
+        # write the opt run header
+        io_file.write("iteration;")
+        for p in params:
+            io_file.write("".join((p[0], ";")))
+        io_file.write("func_val\n")
+
+        # write the opt run data
+        for i, param_vals in enumerate(opt_results.x_iters):
+            io_file.write("".join((str(i), ";")))
+            for x in param_vals:
+                io_file.write("".join((str(x), ";")))
+            io_file.write("".join((str(opt_results.func_vals[i]), "\n")))
         io_file.close()
 
     def create_run_log_header(self):
         self.run_io.write(
-            "iteration;abs_runtime;func_evals;swaps,reaction;best_solution\n")
+            "iteration;abs_runtime;func_evals;swaps;reaction;best_solution\n")
 
     def log_iteration(self, it_num: int, func_evals: int, swap_num: int, reaction: bool, best_solution: float):
         """
@@ -78,6 +115,8 @@ class Logger():
             reaction (bool): If the change handling reaction was triggered or not 
             best_solution (float): The iteration best solution quality
         """
+        if self.mode != self.MODE_RUN:
+            return
         runtime = timeit.default_timer() - self.starttime
         self.log_list.append(
             [it_num, runtime, func_evals, swap_num, reaction, best_solution])
@@ -88,5 +127,3 @@ class Logger():
         io_file = self.create_file_wrapper("results.csv")
         #rpd_list = [((x[4] - optimal_solution) / optimal_solution) for x in self.log_list]
         #time_list =  [x[1] for x in self.log_list]
-
-    
