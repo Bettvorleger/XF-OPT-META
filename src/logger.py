@@ -2,7 +2,7 @@ import timeit
 import json
 from pathlib import Path
 from re import findall
-from config import params
+from functools import partial
 
 
 class Logger():
@@ -24,7 +24,7 @@ class Logger():
         if (suffix_number == 0):
             self.suffix_number = self.init_folder()
 
-        modes[self.mode]
+        self.init_mode = partial(modes[self.mode])
 
     def run(self):
         self.run_io = self.create_file_wrapper("run.csv")
@@ -35,8 +35,10 @@ class Logger():
     def experiment(self):
         pass
 
-    def optimize(self):
-        pass
+    def optimize(self, params):
+        self.params = params
+        self.best_params_list = []
+        
 
     def init_folder(self) -> int:
         """
@@ -75,12 +77,12 @@ class Logger():
         """
         return open("".join((self.path, self.path_prefix[self.mode], str(self.suffix_number), "/", filename)), "a")
 
-    def create_info_log(self, params):
+    def create_info_log(self, info):
         io_file = self.create_file_wrapper("info.json")
-        io_file.write(json.dumps(params, indent=4, default=str))
+        io_file.write(json.dumps(info, indent=4, default=str))
         io_file.close()
 
-    def create_opt_log(self, opt_results, params, run=1):
+    def create_opt_files(self, opt_results, run=1):
         # dump out all the data from the optimizer run
         io_file = self.create_file_wrapper("opt_log_"+str(run)+".json")
         io_file.write(json.dumps(opt_results, indent=4, default=str))
@@ -89,17 +91,35 @@ class Logger():
         io_file = self.create_file_wrapper("opt_run_"+str(run)+".csv")
         # write the opt run header
         io_file.write("iteration;")
-        for p in params:
+        for p in self.params:
             io_file.write("".join((p[0], ";")))
         io_file.write("func_val\n")
 
         # write the opt run data
         for i, param_vals in enumerate(opt_results.x_iters):
-            io_file.write("".join((str(i), ";")))
+            io_file.write("".join((str(i+1), ";")))
             for x in param_vals:
                 io_file.write("".join((str(x), ";")))
             io_file.write("".join((str(opt_results.func_vals[i]), "\n")))
         io_file.close()
+
+        # write opt run best params to dict
+        self.best_params_list.append([*opt_results.x, opt_results.fun])
+
+    def create_opt_best_params(self):
+        io_file = self.create_file_wrapper("opt_best_params.csv")
+        io_file.write("run;")
+        for p in self.params:
+            io_file.write("".join((p[0], ";")))
+        io_file.write("func_val\n")
+
+        for i, param_vals in enumerate(self.best_params_list):
+            io_file.write("".join((str(i+1), ";")))
+            for x in param_vals:
+                io_file.write("".join((str(x), ";")))
+            io_file.write("\n")
+        io_file.close()
+
 
     def create_run_log_header(self):
         self.run_io.write(

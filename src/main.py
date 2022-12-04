@@ -53,8 +53,8 @@ def check_percent_range(number: float) -> float:
     return number
 
 # TODO:
-#   - implement all logging cases (run: completed, opt: needs better tracking per execution, exp: needs everything)
-#   - logging: include info about problem instace (via median and average) - used for AI training
+#   - implement all logging cases (run: completed, opt: completed, exp: needs everything)
+#   - logging: include info about problem instance (via median and average) - used for AI training
 #   - logging: experimentation: being able to enter number of runs, and analyzing them afterwards
 #   - implement tests
 #   - research sensible parameter boundaries for optimization
@@ -90,6 +90,7 @@ def main():
 
     match args.mode:
         case 'run':
+            logger.init_mode()
             starttime = timeit.default_timer()
             if args.verbose:
                 solution = hsppbo.execute(verbose=True)
@@ -98,15 +99,19 @@ def main():
             print("Solution quality:", solution[1])
             print("Total execution time:", timeit.default_timer() - starttime)
         case 'experiment':
-            pass
+            logger.init_mode()
         case 'optimize':
             hsppbo.set_random_seed()
+            logger.init_mode(params['hsppbo'])
             opt = Optimizer("bayesian", hsppbo.execute_wrapper,
                             params['hsppbo'])
-            for i in range(1,runs+1):
-                print("---STARTING OPTIMIZATION RUN " + str(i) + "/" + str(runs) + "---")
-                opt_res = opt.run(verbose=args.verbose, n_calls=2, random_state=i)
-                logger.create_opt_log(opt_res, params['hsppbo'], run=i)
+            for i in range(1, runs+1):
+                print("---STARTING OPTIMIZATION RUN " +
+                      str(i) + "/" + str(runs) + "---")
+                opt_res = opt.run(verbose=args.verbose,
+                                  n_calls=2, random_state=i)
+                logger.create_opt_files(opt_res, run=i)
+            logger.create_opt_best_params()
 
 
 def get_run_number() -> None:
@@ -115,7 +120,7 @@ def get_run_number() -> None:
     if x.lower() == 'y' or x.lower() == 'yes':
         print('How many runs do you want to execute? (max. 30)')
         runs = input()
-        if 0 < int(runs) <= 30: 
+        if 0 < int(runs) <= 30:
             return int(runs)
     return 1
 
