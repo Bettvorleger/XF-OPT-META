@@ -13,7 +13,7 @@ def user_input():
     parser.add_argument('-v', '--verbose',
                         help="Turn on output verbosity", action='store_true')
     parser.add_argument('-m', '--mode', type=str, choices=[
-                        'run', 'optimize', 'experiment'], default='run', help='Mode of execution for the given problem and/or algorithm')
+                        'run', 'opt', 'exp'], default='run', help='Mode of execution for the given problem and/or algorithm')
     parser.add_argument('-p', '--problem', type=str, default='rat195',
                         help='Name of the problem instance, e.g. the TSPLIB names like "rat195"')
     parser.add_argument('-pt', '--problem-type', type=str, default='TSP',
@@ -63,15 +63,8 @@ def check_percent_range(number: float) -> float:
 
 def main():
     args = user_input()
-    match args.mode:
-        case 'run':
-            logger = Logger(mode='run')
-        case 'experiment':
-            logger = Logger(mode='exp')
-            runs = get_run_number()
-        case 'optimize':
-            logger = Logger(mode='opt')
-            runs = get_run_number()
+
+    logger = Logger(mode=args.mode)
 
     if (args.problem_type == 'TSP'):
         problem = TSP(tsplib_name=args.problem)
@@ -92,24 +85,30 @@ def main():
         case 'run':
             logger.init_mode()
             starttime = timeit.default_timer()
-            if args.verbose:
-                solution = hsppbo.execute(verbose=True)
-            else:
-                solution = hsppbo.execute()
+            solution = hsppbo.execute(verbose=args.verbose)
             print("Solution quality:", solution[1])
             print("Total execution time:", timeit.default_timer() - starttime)
-        case 'experiment':
-            logger.init_mode()
-        case 'optimize':
+
+        case 'exp':
+            runs = get_run_number()
+            logger.init_mode(runs)
+            for i in range(1, runs+1):
+                hsppbo.execute(verbose=args.verbose)
+                hsppbo.tree.reset()
+                logger.add_run_exp()
+            logger.create_exp_avg_run()
+
+        case 'opt':
             hsppbo.set_random_seed()
-            logger.init_mode(params['hsppbo'])
+            runs = get_run_number()
+            logger.init_mode(params['opt']['hsppbo'])
             opt = Optimizer("bayesian", hsppbo.execute_wrapper,
-                            params['hsppbo'])
+                            params['opt']['hsppbo'])
             for i in range(1, runs+1):
                 print("---STARTING OPTIMIZATION RUN " +
                       str(i) + "/" + str(runs) + "---")
                 opt_res = opt.run(verbose=args.verbose,
-                                  n_calls=2, random_state=i)
+                                  n_calls=10, random_state=i)
                 logger.create_opt_files(opt_res, run=i)
             logger.create_opt_best_params()
 

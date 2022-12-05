@@ -1,17 +1,28 @@
 from skopt.space import Real, Integer, Categorical
 
 params = {
-    "hsppbo":
-    [
-        ('alpha', Integer(1, 10)),
-        ('beta', Integer(1, 10)),
-        #('w_rand', Real(0, 0.1)),
-        ('w_pers_best', Real(0.01, 0.1)),
-        ('w_pers_prev', Real(0.01, 0.1)),
-        ('w_parent_best', Real(0.005, 0.02)),
-        #('detection_threshold', Real(0, 0.5)),
-        #('reaction_type', Categorical(['partial', 'full', 'none'])),
-    ]
+    "opt": {
+        "hsppbo":
+        [
+            ('alpha', Integer(1, 10)),
+            ('beta', Integer(1, 10)),
+            #('w_rand', Real(0, 0.1)),
+            ('w_pers_best', Real(0.01, 0.1)),
+            ('w_pers_prev', Real(0.01, 0.1)),
+            ('w_parent_best', Real(0.005, 0.02)),
+            #('detection_threshold', Real(0, 0.5)),
+            #('reaction_type', Categorical(['partial', 'full', 'none'])),
+        ]},
+    "exp": {
+        "hsppbo":
+        [
+            ('detection_threshold', 0.1, 0.25, 0.5)
+        ],
+        "problem":
+        [
+            ('dynamic_intensity', 10, 25, 50),
+        ]
+    }
 }
 
 conf = {

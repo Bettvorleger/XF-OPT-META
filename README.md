@@ -18,8 +18,8 @@ python main.py -h
 There are three pre-definded use cases:
 
 - Run Mode (--mode run, default)
-- Experimentation Mode (--mode experiment)
-- Optimization Mode (--mode optimize)
+- Experimentation Mode (--mode exp)
+- Optimization Mode (--mode opt)
 
 Each case is provided with a default TSPLIB problem instance (rat195), that can be changed as well, even using different problem types, like QAP for example.
 

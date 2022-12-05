@@ -30,10 +30,6 @@ class TSP(Problem):
         self.recipr_dist_matrix = np.reciprocal(
             self.distance_matrix, where=self.distance_matrix != 0)
 
-        self.dynamic_intensity = int(ceil(0.2 * self.dimension))
-        self.dynamic_frequency = 100
-        self.min_iteration_count = 2000-1
-
     def set_dynamic(self, dynamic_intensity=0.2, dynamic_frequency=100, min_iteration_count=2000-1) -> None:
         """
         Apply dynamic properties to the TSP, making it a dynamic TSP
@@ -43,7 +39,7 @@ class TSP(Problem):
             dynamic_frequency (int, optional): After how many iterations a change occurs. Defaults to 100.
         """
         self.dynamic_intensity = int(ceil(
-            dynamic_intensity * self.dimension))  # How many cities are going to change per dynamic call
+            dynamic_intensity * self.dimension / 2))  # How many cities are going to change per dynamic call
 
         # for dynamic TSP the cities are swaped in pairs, so the intensity needs to be even
         if self.dynamic_intensity % 2 != 0:
@@ -87,9 +83,12 @@ class TSP(Problem):
         if self.dynamic:
             if iteration_count % self.dynamic_frequency == 0 and iteration_count > self.min_iteration_count:
 
+                # get random permuatation of all city nodes
                 cities = self.rng.permutation(range(self.dimension))
+                # only use the amount specified by dynamic intensity
                 cities = cities[0:self.dynamic_intensity]
 
+                # create pairs with the split of the array in half
                 city_pairs = [list(a) for a in np.array_split(
                     cities, len(cities)/2)]
 

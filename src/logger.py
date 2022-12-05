@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 from re import findall
 from functools import partial
+from datetime import datetime
+import numpy as np
 
 
 class Logger():
@@ -26,19 +28,24 @@ class Logger():
 
         self.init_mode = partial(modes[self.mode])
 
+        self.run_params = ["iteration", "abs_runtime",
+                           "func_evals", "swaps", "reaction", "best_solution"]
+
     def run(self):
         self.run_io = self.create_file_wrapper("run.csv")
         self.create_run_log_header()
         self.starttime = timeit.default_timer()
-        self.log_list = []
+        self.run_list = []
 
-    def experiment(self):
-        pass
+    def experiment(self, runs):
+        self.starttime = timeit.default_timer()
+        self.run_list = []
+        self.exp_run_list = [
+            [[] for j in range(runs)] for i in range(len(self.run_params))]
 
     def optimize(self, params):
         self.params = params
         self.best_params_list = []
-        
 
     def init_folder(self) -> int:
         """
@@ -77,8 +84,9 @@ class Logger():
         """
         return open("".join((self.path, self.path_prefix[self.mode], str(self.suffix_number), "/", filename)), "a")
 
-    def create_info_log(self, info):
+    def create_info_log(self, info: dict):
         io_file = self.create_file_wrapper("info.json")
+        info['datetime'] = datetime.now()
         io_file.write(json.dumps(info, indent=4, default=str))
         io_file.close()
 
@@ -114,16 +122,27 @@ class Logger():
         io_file.write("func_val\n")
 
         for i, param_vals in enumerate(self.best_params_list):
-            io_file.write("".join((str(i+1), ";")))
-            for x in param_vals:
-                io_file.write("".join((str(x), ";")))
+            io_file.write(str(i+1)+";")
+            io_file.write(";".join(str(x) for x in param_vals))
             io_file.write("\n")
         io_file.close()
 
+    def add_run_exp(self):
+        for i_key, i_val in enumerate(self.run_list.copy()):
+            for k in range(0, len(self.exp_run_list)):
+                self.exp_run_list[k][i_key].append(i_val[k])
+
+        self.run_list.clear()
+        self.starttime = timeit.default_timer()
+
+    def create_exp_avg_run(self):
+        io_file = self.create_file_wrapper("avg_run.csv")
+        io_file.write(";".join(self.run_params) + "\n")
+
+        io_file.close()
 
     def create_run_log_header(self):
-        self.run_io.write(
-            "iteration;abs_runtime;func_evals;swaps;reaction;best_solution\n")
+        self.run_io.write(";".join(self.run_params) + "\n")
 
     def log_iteration(self, it_num: int, func_evals: int, swap_num: int, reaction: bool, best_solution: float):
         """
@@ -135,11 +154,15 @@ class Logger():
             reaction (bool): If the change handling reaction was triggered or not 
             best_solution (float): The iteration best solution quality
         """
+
+        if self.mode == self.MODE_EXPERIMENT or self.mode == self.MODE_RUN:
+            runtime = timeit.default_timer() - self.starttime
+            self.run_list.append(
+                [it_num, runtime, func_evals, swap_num, reaction, best_solution])
+
         if self.mode != self.MODE_RUN:
             return
-        runtime = timeit.default_timer() - self.starttime
-        self.log_list.append(
-            [it_num, runtime, func_evals, swap_num, reaction, best_solution])
+
         self.run_io.write("%d;%0.3f;%d;%d;%r;%f\n" %
                           (it_num, runtime, func_evals, swap_num, reaction, best_solution))
 

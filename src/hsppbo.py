@@ -65,8 +65,9 @@ class HSPPBO:
             int: Best solution (tuple of path and length) found during the runtime of the algorithm.  
         """
 
+        # set the params for the algorithm run
         for k, v in enumerate(args[0]):
-            self.__dict__[params['hsppbo'][k][0]] = v
+            self.__dict__[params['opt']['hsppbo'][k][0]] = v
 
         self.tree.reset()
         i = self.execute()[1]
