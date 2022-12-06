@@ -11,13 +11,10 @@ from config import params
 
 
 class HSPPBO:
-    max_iteration_count = 100  # maximum number of iterations
     sce_count = 13  # number of solution creating entities (SCE)
     sce_child_count = 3  # number of child nodes for each SCE
-    # min number of iterations between change handling procedures (variable L in literaute)
-    CHANGE_PAUSE = 5
 
-    def __init__(self, problem: Problem, logger: Logger, pers_best=0.075, pers_prev=0.075, parent_best=0.01, alpha=1, beta=9, detection_threshold=0.25, reaction_type='partly') -> None:
+    def __init__(self, problem: Problem, logger: Logger, pers_best=0.075, pers_prev=0.075, parent_best=0.01, alpha=1, beta=9, detection_threshold=0.25, reaction_type='partly', detection_pause=5, max_iteration_count=2600) -> None:
         """
         Initialize the hsppbo algorithm with the given parameters.
 
@@ -30,7 +27,9 @@ class HSPPBO:
             alpha (int, optional): Influence of the probabilistic/non-heuristic component. Defaults to 1.
             beta (int, optional): Influence of the heuristic component. Defaults to 5.
             detection_threshold (float, optional): Threshold (swaps per SCE and iteration) for detecting a change. Defaults to 0.25.
+            detection_pause (int, optional): Min number of iterations between change handling procedures (variable L in literaute). Defaults to 5.
             reaction_type (str, optional): Type of reaction algorithm used to handle a change in the problem. Defaults to 'partial'.
+            max_iteration_count (int, optional): Maximum number of iterations per algorithm run. Defaults to 2600.
         """
         self.problem = problem
         self.logger = logger
@@ -44,7 +43,9 @@ class HSPPBO:
         self.alpha = alpha
         self.beta = beta
         self.detection_threshold = detection_threshold
+        self.detection_pause = detection_pause
         self.reaction_type = reaction_type
+        self.max_iteration_count = max_iteration_count
 
         self.fixed_rng = False
 
@@ -84,7 +85,7 @@ class HSPPBO:
             tuple[list, int]: Best solution (tuple of path and length) found during the runtime of the algorithm.       
         """
         self.tree.init_tree()
-        change_pause_count = self.CHANGE_PAUSE
+        detection_pause_count = self.detection_pause
 
         for i in range(0, self.max_iteration_count):
 
@@ -99,8 +100,8 @@ class HSPPBO:
                     self.tree.set_node_quality(sce, pp_quality, pb_quality)
 
             # count up the change pause counter up to the constant
-            if change_pause_count < self.CHANGE_PAUSE:
-                change_pause_count += 1
+            if detection_pause_count < self.detection_pause:
+                detection_pause_count += 1
 
             if (self.problem.dimension > 100):
                 with WorkerPool() as pool:
@@ -134,8 +135,8 @@ class HSPPBO:
             # if the threshold for detecting a dynamic change is met,
             # trigger the change handling procedure of the tree and reset the change pause counter
             if swap_count > (self.detection_threshold * self.sce_count):
-                if change_pause_count == self.CHANGE_PAUSE:
-                    change_pause_count = 0
+                if detection_pause_count == self.detection_pause:
+                    detection_pause_count = 0
                     self.tree.change_handling(self.reaction_type)
 
             if i % 10 == 0 and verbose:
@@ -144,7 +145,7 @@ class HSPPBO:
 
             best_solution = self.tree.get_best_solution(self.tree.tree.root)[1]
             self.logger.log_iteration(
-                i, self.sce_count*(i+1), swap_count, change_pause_count == 0, best_solution)
+                i, self.sce_count*(i+1), swap_count, detection_pause_count == 0, best_solution)
 
         best_solution = self.tree.get_best_solution(self.tree.tree.root)
 
@@ -166,6 +167,10 @@ class HSPPBO:
             tuple[int, tuple[int]]: A tuple containing the current SCE index (for multiprocessing reasons) and the solution path
         """
 
+        # due to multiprocessing sharing the RNG,
+        # each function call needs its own individual seed.
+        # Using the current iteration and sce_index makes it reproducable.
+        # Otherwise random bits from system entropy are used to init the seed, creating "more" randomness
         if self.fixed_rng:
             random.seed(sce_index*iteration+iteration)
         else:
@@ -248,6 +253,7 @@ class HSPPBO:
         """
         return {
             'hsppbo': {
+                'max_iteration_count': self.max_iteration_count,
                 'w_pers_best': self.w_pers_best,
                 'w_pers_prev': self.w_pers_prev,
                 'w_parent_best': self.w_parent_best,
@@ -255,6 +261,7 @@ class HSPPBO:
                 'alpha': self.alpha,
                 'beta': self.beta,
                 'detection_threshold': self.detection_threshold,
+                'detection_pause': self.detection_pause,
                 'reaction_type': self.reaction_type,
                 'fixed_rng': self.fixed_rng
             },

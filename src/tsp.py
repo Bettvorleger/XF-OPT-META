@@ -39,7 +39,7 @@ class TSP(Problem):
             dynamic_frequency (int, optional): After how many iterations a change occurs. Defaults to 100.
         """
         self.dynamic_intensity = int(ceil(
-            dynamic_intensity * self.dimension / 2))  # How many cities are going to change per dynamic call
+            dynamic_intensity * self.dimension))  # How many cities are going to change per dynamic call
 
         # for dynamic TSP the cities are swaped in pairs, so the intensity needs to be even
         if self.dynamic_intensity % 2 != 0:
@@ -256,6 +256,8 @@ class TSP(Problem):
             "name": self.instance.name,
             "dimension": self.dimension,
             "weight_type": self.instance.edge_weight_type,
+            "median_distance": self.get_median_distance(),
+            "average_distance": self.get_average_distance(),
             "dynamic_props": dynamic_props
         }
     

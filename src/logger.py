@@ -4,15 +4,26 @@ from pathlib import Path
 from re import findall
 from functools import partial
 from datetime import datetime
-import numpy as np
 
 
-class Logger():
+class Logger:
+    # specify run mode constants
     MODE_RUN = "run"
     MODE_EXPERIMENT = "exp"
     MODE_OPTIMIZE = "opt"
 
     def __init__(self, path="output/", mode=MODE_RUN, suffix_number=0) -> None:
+        """
+        Create a logger instance for creating all relevant files for a given algorithm mode
+        Modes are:
+            - MODE_RUN(run): normal execution of one run of the algorithm
+            - MODE_EXPERIMENT(exp): creating averaged 
+
+        Args:
+            path (str, optional): _description_. Defaults to "output/".
+            mode (_type_, optional): _description_. Defaults to MODE_RUN.
+            suffix_number (int, optional): _description_. Defaults to 0.
+        """
         self.path = path
         self.mode = mode
         modes = {
@@ -130,6 +141,9 @@ class Logger():
     def add_run_exp(self):
         for i_key, i_val in enumerate(self.run_list.copy()):
             for k in range(0, len(self.exp_run_list)):
+                print(self.exp_run_list)
+                print(k)
+                print(i_key)
                 self.exp_run_list[k][i_key].append(i_val[k])
 
         self.run_list.clear()
@@ -165,8 +179,3 @@ class Logger():
 
         self.run_io.write("%d;%0.3f;%d;%d;%r;%f\n" %
                           (it_num, runtime, func_evals, swap_num, reaction, best_solution))
-
-    def create_run_results(self, optimal_solution):
-        io_file = self.create_file_wrapper("results.csv")
-        #rpd_list = [((x[4] - optimal_solution) / optimal_solution) for x in self.log_list]
-        #time_list =  [x[1] for x in self.log_list]

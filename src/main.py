@@ -53,9 +53,10 @@ def check_percent_range(number: float) -> float:
     return number
 
 # TODO:
-#   - implement all logging cases (run: completed, opt: completed, exp: needs everything)
-#   - logging: include info about problem instance (via median and average) - used for AI training
-#   - logging: experimentation: being able to enter number of runs, and analyzing them afterwards
+#   - implement all logging cases (run: completed, opt: completed, exp: in progress )
+#   - all modes: add relative difference to optimal solution to every output
+#   - experiment mode: create csv for experiment, averaged over multiple runs
+#   - implement analyzer/grapher module
 #   - implement tests
 #   - research sensible parameter boundaries for optimization
 #   - web UI (flask) and better packaging
@@ -77,7 +78,7 @@ def main():
         problem.set_dynamic(args.dynamic_intensity)
 
     hsppbo = HSPPBO(problem, logger, args.personal_best, args.personal_previous, args.parent_best,
-                    args.alpha, args.beta, args.dynamic_detection_threshold, args.reaction_type)
+                    args.alpha, args.beta, args.dynamic_detection_threshold, args.reaction_type, max_iteration_count=100)
 
     logger.create_info_log(hsppbo.get_info())
 
