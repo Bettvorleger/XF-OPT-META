@@ -52,14 +52,21 @@ def check_percent_range(number: float) -> float:
 
     return number
 
-# TODO:
+# TODO code:
 #   - implement all logging cases (run: completed, opt: completed, exp: in progress )
 #   - all modes: add relative difference to optimal solution to every output
 #   - experiment mode: create csv for experiment, averaged over multiple runs
 #   - implement analyzer/grapher module
+
+# TODO code(optional):
 #   - implement tests
-#   - research sensible parameter boundaries for optimization
 #   - web UI (flask) and better packaging
+#   - feature selection option -> PCA https://betterdatascience.com/feature-importance-python/
+
+# TODO thesis:
+#   - research sensible parameter boundaries for optimization
+#   - how does optimizer handle categorial values?
+#   - write up of the thesis/experiemtation structure
 
 
 def main():
@@ -80,13 +87,14 @@ def main():
     hsppbo = HSPPBO(problem, logger, args.personal_best, args.personal_previous, args.parent_best,
                     args.alpha, args.beta, args.dynamic_detection_threshold, args.reaction_type, max_iteration_count=100)
 
-    logger.create_info_log(hsppbo.get_info())
+    logger.set_info(hsppbo.get_info())
 
     match args.mode:
         case 'run':
             logger.init_mode()
             starttime = timeit.default_timer()
             solution = hsppbo.execute(verbose=args.verbose)
+            logger.close_run_logger()
             print("Solution quality:", solution[1])
             print("Total execution time:", timeit.default_timer() - starttime)
 
@@ -96,20 +104,22 @@ def main():
             for i in range(1, runs+1):
                 hsppbo.execute(verbose=args.verbose)
                 hsppbo.tree.reset()
-                logger.add_run_exp()
+                logger.close_run_logger()
+                logger.add_exp_run(i)
             logger.create_exp_avg_run()
 
         case 'opt':
+            opt_algo = 'bayesian'
             hsppbo.set_random_seed()
             runs = get_run_number()
-            logger.init_mode(params['opt']['hsppbo'])
-            opt = Optimizer("bayesian", hsppbo.execute_wrapper,
+            logger.init_mode(params['opt']['hsppbo'], opt_algo)
+            opt = Optimizer(opt_algo, hsppbo.execute_wrapper,
                             params['opt']['hsppbo'])
             for i in range(1, runs+1):
                 print("---STARTING OPTIMIZATION RUN " +
                       str(i) + "/" + str(runs) + "---")
                 opt_res = opt.run(verbose=args.verbose,
-                                  n_calls=10, random_state=i)
+                                  n_calls=5, random_state=i)
                 logger.create_opt_files(opt_res, run=i)
             logger.create_opt_best_params()
 
