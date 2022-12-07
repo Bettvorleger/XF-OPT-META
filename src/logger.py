@@ -5,6 +5,8 @@ from re import findall
 from functools import partial
 from datetime import datetime
 from config import logger_run_params
+import pandas as pd
+import numpy as np
 
 
 class Logger:
@@ -72,8 +74,7 @@ class Logger:
         self.create_run_log_header()
         self.starttime = timeit.default_timer()
         self.run_list = []
-        self.exp_run_list = [
-            [[] for j in range(runs)] for i in range(len(self.run_params))]
+        self.exp_run_list = []
 
     def init_optimize(self, params: list[tuple], opt_algo: str) -> None:
         """
@@ -195,18 +196,14 @@ class Logger:
         io_file.close()
 
     def add_exp_run(self, run: int) -> None:
-        """
-        []
+        if run == 1:
+            self.exp_run_list = [
+                [[] for j in range(len(self.run_list))] for i in range(len(self.run_params))]
+        #run_list_reversed = (pd.DataFrame(self.run_list).T).values.tolist()
+        for i_key, i_val in enumerate(self.run_list):
+            for p_key in range(len(self.run_params)):
+                self.exp_run_list[p_key][i_key].append(i_val[p_key])
 
-        print(self.run_list)
-        for i_key, i_val in enumerate(self.run_list.copy()):
-            for k in range(0, len(self.exp_run_list)):
-                print(self.exp_run_list)
-                print(k)
-                print(i_key)
-                self.exp_run_list[k][i_key].append(i_val[k])
-
-        """
         # prevents from adding an empty file at the end
         if run < self.max_runs:
             self.run_io = self.create_file_wrapper(
@@ -217,7 +214,10 @@ class Logger:
 
     def create_exp_avg_run(self) -> None:
         io_file = self.create_file_wrapper("avg_run.csv")
-        io_file.write(";".join(self.run_params) + "\n")
+        df = pd.DataFrame(self.exp_run_list, index=(self.run_params))
+        #df.iloc[[0]] = df.iloc[[0]].apply(lambda x: x[0])
+        #print(df.iloc[[0]])
+        df.to_csv(io_file)
         io_file.close()
 
     def create_run_log_header(self) -> None:

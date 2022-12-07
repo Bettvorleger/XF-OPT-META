@@ -11,7 +11,7 @@ params = {
             ('w_pers_prev', Real(0.01, 0.1)),
             ('w_parent_best', Real(0.005, 0.02)),
             #('detection_threshold', Real(0, 0.5)),
-            ('reaction_type', Categorical(['partial', 'full', 'none'])),
+            #('reaction_type', Categorical(['partial', 'full', 'none'])),
         ]},
     "exp": {
         "hsppbo":
