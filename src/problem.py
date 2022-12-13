@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 
 class Problem(ABC):
+    TYPE = None
     """
     Abstract method (interface) for possible problem instances.
     """

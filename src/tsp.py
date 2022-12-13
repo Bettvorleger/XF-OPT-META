@@ -6,13 +6,19 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import json
+from scipy.spatial import ConvexHull
 
 
-class TSP(Problem):
+class TSP(Problem):    
     dynamic = False
+    TYPE = 'TSP'
 
     # Fix rounding issue for eucledian 2D weight calc, always output float
     tsplib95.distances.TYPES["EUC_2D"] = partial(
+        tsplib95.distances.euclidean, round=lambda x: x)
+    tsplib95.distances.TYPES["GEO"] = partial(
+        tsplib95.distances.euclidean, round=lambda x: x)
+    tsplib95.distances.TYPES["ATT"] = partial(
         tsplib95.distances.euclidean, round=lambda x: x)
 
     def __init__(self, tsplib_name: str, problem_path="../problems/tsp/") -> None:
@@ -141,20 +147,20 @@ class TSP(Problem):
 
     def get_optimal_solution(self) -> float:
         try:
-            with open(self.problem_path+'../optimal.json', 'r') as f:
-                optimal = json.load(f)
-                return optimal["tsp"]["tsplib"]["stsp"][self.instance.name]
+            with open(self.problem_path+'../metadata.json', 'r') as f:
+                metadata = json.load(f)
+                return metadata["tsp"]["tsplib"]["stsp"][self.instance.name]['optimal']
         except:
             return None
 
-    def get_average_distance(self) -> float:
+    def get_mean_distance(self) -> float:
         """
-        Calculate the average distance of the tsp paths via the distance matrix
+        Calculate the mean distance of the tsp paths via the distance matrix
 
         Returns:
-            float: average distance between nodes
+            float: mean distance between nodes
         """
-        return np.average(self.distance_matrix)
+        return np.mean(self.distance_matrix)
 
     def get_median_distance(self) -> float:
         """
@@ -164,6 +170,78 @@ class TSP(Problem):
             float: median distance between nodes
         """
         return np.median(self.distance_matrix)
+
+    def get_standard_deviation(self) -> float:
+        """
+        Calculate the standard deviation of distances of the tsp paths via the distance matrix
+
+        Returns:
+            float: standard deviation of distances between nodes
+        """
+        return np.std(self.distance_matrix)
+
+    def get_coefficient_of_variation(self) -> float:
+        """
+        Calculate the coefficient of variation of distances of the tsp paths via the distance matrix
+
+        Returns:
+            float: coefficient of variation of distances between nodes
+        """
+        return (np.std(self.distance_matrix)/np.mean(self.distance_matrix))
+
+    def get_first_eigenvalue(self) -> float:
+        """
+        Calculate the first eigenvalue of the distance matrix
+
+        Returns:
+            float: the first eigenvalue of the distance matrix
+        """
+        return (np.linalg.eig(self.distance_matrix)[0])[0].real
+
+    def get_quartile_dispersion_coefficient(self) -> tuple[float, float]:
+        """
+        Calculate the quartile coefficient of dispersion via the distance matrix.
+        It can be used as a robust version of the coefficient of variation.
+        There are two definitions for the QDC:
+        1. (Q3-Q1)/(Q3+Q1)
+        2. (Q3-Q1)/Q2
+        Version 2 is implemented
+
+        Returns:
+            tuple[float, float]: quartile coefficient of dispersion of distances between nodes
+        """
+        Q1 = np.quantile(self.distance_matrix, 0.25)
+        Q3 = np.quantile(self.distance_matrix, 0.75)
+        # return (Q3-Q1)/np.median(self.distance_matrix)
+        return (Q3-Q1)/(Q3+Q1)
+
+    def get_regularity_index(self) -> float:
+        """
+        Calculating the regularity index according to [1] and [2].
+        It gives an impression of how much the distribution of nodes compares to a random one.
+        A value of R = 1 would suggest a random distribution, values near 0 indicate a clustered distribution,
+        and values greater than 1 point to a uniform distribution, with R = 2.1491 being the theoretical maximum of a triangular lattice arrangement according to [3].
+        The generated trilattice64 arrangement, a two-dimensional grid graph of size 8x8 in which each square unit has a diagonal edge (provided within the visulizations), has an R value of 2.
+
+        [1] Dry, Matthew; Preiss, Kym; and Wagemans, Johan (2012) "Clustering, Randomness, and Regularity: Spatial Distributions and Human Performance on the Traveling Salesperson Problem and Minimum Spanning Tree Problem," The Journal of Problem Solving: Vol. 4 : Iss. 1, Article 2. 
+        [2] G. C. Crişan, E. Nechita and D. Simian, "On Randomness and Structure in Euclidean TSP Instances: A Study With Heuristic Methods," in IEEE Access, vol. 9, pp. 5312-5331, 2021, doi: 10.1109/ACCESS.2020.3048774.
+        [3] Clark, Philip J., and Francis C. Evans. “Distance to Nearest Neighbor as a Measure of Spatial Relationships in Populations.” Ecology, vol. 35, no. 4, 1954, pp. 445–53. JSTOR, https://doi.org/10.2307/1931034. Accessed 12 Dec. 2022.
+
+        Returns:
+            float: R index
+        """
+        vert = self.instance.node_coords
+        vert_arr = np.array([(x[0], x[1]) for x in vert.values()])
+
+        hull = ConvexHull(vert_arr)
+        dm = self.distance_matrix.copy()
+
+        np.fill_diagonal(dm, np.inf)
+        nearest_neighbor_sum = np.sum(np.amin(dm, axis=1))
+
+        R = np.sqrt(2)*nearest_neighbor_sum / \
+            np.sqrt(hull.volume*self.dimension)
+        return R
 
     def swap_nodes(self, node_1: int, node_2: int):
         """
@@ -190,6 +268,7 @@ class TSP(Problem):
         Create an interactive view or png image from the problem instance and optionally, the solution path
 
         Args:
+            solution (list[int], optional): List of node indices that construct the solution path
             interactive (bool, optional): Wether the interactive plot viewer should be used. Defaults to True.
             path (str, optional): If non-interactive, which relative path the image is saved to. Defaults to ".".
         """
@@ -228,6 +307,7 @@ class TSP(Problem):
         else:
             plt.savefig(filepath+"/"+self.instance.name +
                         ".png", bbox_inches="tight", )
+            plt.close()
 
     @property
     def dimension(self) -> int:
@@ -260,7 +340,7 @@ class TSP(Problem):
             "average_distance": self.get_average_distance(),
             "dynamic_props": dynamic_props
         }
-    
+
     def __str__(self) -> str:
         dynamic_props = ""
         if self.dynamic:
