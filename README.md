@@ -128,13 +128,13 @@ The resulting structural groups are:
 
 These 10 examples, will also be used within the thesis, as they cover each of the structural groups with a smaller and a larger instance. Shown here are the visualizations of these instances:
 
-| Group/Size |  Smaller instances [50,250]                | Larger instances [250,450]                 |
-|------------|--------------------------------------------|--------------------------------------------|
-| 1          | eil51![image](problems/tsp/visualizations/eil51.png) | rat195![image](problems/tsp/visualizations/rat195.png) |
+| Group/Size | Smaller instances [50,250]                                 | Larger instances [250,450]                             |
+| ---------- | ---------------------------------------------------------- | ------------------------------------------------------ |
+| 1          | eil51![image](problems/tsp/visualizations/eil51.png)       | rat195![image](problems/tsp/visualizations/rat195.png) |
 | 2          | berlin52![image](problems/tsp/visualizations/berlin52.png) | gil262![image](problems/tsp/visualizations/gil262.png) |
-| 3          | pr136![image](problems/tsp/visualizations/pr136.png) | lin318![image](problems/tsp/visualizations/lin318.png) |
-| 4          | pr226![image](problems/tsp/visualizations/pr226.png) | pr439![image](problems/tsp/visualizations/pr439.png) |
-| 5          | d198![image](problems/tsp/visualizations/d198.png) | fl417![image](problems/tsp/visualizations/fl417.png) |
+| 3          | pr136![image](problems/tsp/visualizations/pr136.png)       | lin318![image](problems/tsp/visualizations/lin318.png) |
+| 4          | pr226![image](problems/tsp/visualizations/pr226.png)       | pr439![image](problems/tsp/visualizations/pr439.png)   |
+| 5          | d198![image](problems/tsp/visualizations/d198.png)         | fl417![image](problems/tsp/visualizations/fl417.png)   |
 
 
 ### 3.2. Choice of parameters and value ranges for optimization
@@ -181,6 +181,37 @@ The parameter L will be set to a static value of 5 and not optimized.
 
 ### 3.3. Test Procedure 
 
+The basis of each test will be the HSPPBO algorithm, executing 2600 iterations on a dynamic TSP instance. The dynamic part (swapping a percentage of cities), happens every 100 iterations, starting from iteration 2000.
+Each of the 10 problem instances mentioned above will be used, with changing dynamic intensity C ∈ {10,25,50}, so three runs for each instance, 30 runs in total for one whole dynamic algorithm evaluation.
+
+The tests carried out in this thesis can be divided into three main parts.
+
+The first part will deal with the selection of the most suitable hyperoptimization method to use for the HSPPBO algorithm and its dynamic problem instances.
+For that, we will do three runs for each of the four optimizing algorithms provided by the skopt package, that being random search, bayesian optimization, decision trees (using extra trees regressor) and gradient boosted trees, and select the algorithm with the highest average solution quality, and secondary, the highest stability in parameters per instance.
+Each of these runs will make 30 calls to the HSPPBO algorithm (n_calls) on only the five smaller problem instances and only the medium dynamic intensity. So 4 optimizers doing 3 runs with 30 calls on 5 instances with one dynamic intensity, 1800 HSPPBO algorithm evaluations, taking approximately 200 hours to complete without parallelizing the runs, potentially cutting the time down by 1/12.
+A few shortcuts needed to be performed in this step to save some execution time. Since a full dynamic algorithm evaluation of 30 runs would take to long, we limit ourselves to only the smaller TSP instances and only the medium dynamic intensity. Furthermore, we limit our optimizers to only 30 function calls instead of 50 or more, implying that a convergent behavior should have started at around 20 calls (according to [[13]](#13)). Besides, this fast convergence may also be seen as a requirement to the hyperoptimizing method we want to choose. Lastly, the stability or robustness of the parameters selected by the optimizers is only secondary in this part, so three runs will be enough for an average solution quality.
+
+The second part will do multiple, dynamic algorithm evaluations with the best suited optimizing method chosen from the previous part.
+These results will give us insight on what the optimal parameter selection might be for each problem instance, or potentially, for all of them.
+For this we execute 6 runs using one optimizer, each run making 60 calls to the HSPPBO algorithm, on, again, only the 5 smaller problem instances but all three dynamic intensities - a total of 5400 HSPPBO algorithm evaluations, taking approximately 600 hours to complete sequentially, again, with potential to cut down the time through parallelization. As explained before, we cannot use the larger instances for time saving reasons.
+
+Ideally, we now have five sets of optimal parameters, one for each category of problem, by averaging the three dynamic intensities. Additionally, we create a sixth set by averaging all 5 sets, using this a "general purpose" parameter set.
+
+The third and final part will verify the previously selected "optimal" parameter selection. 
+The original 5 sets of parameters will be executed on their respective problem instances, with 10 repetitions each. This time, all 10 instances and all three dynamic intensities will be used. We also execute the general purpose parameter set on all 10 instances with all three intensities, while also repeating that 10 times. This results in 5\*(2\*10\*3) + 10\*10\*3 = 600 HSPPBO algorithm evaluations, taking around 120 hours.
+
+
+### 3.4. Analyzing Procedure 
+
+The three parts will all be subject to a different goal of conclusion.
+
+Part one focuses on the ideal hyperoptimization method to use. Therefore, the convergence behavior, the resulting solution quality and the stability of the selected parameters will be subject of this part.
+
+Part two focuses on the difference (and similarities) between the optimal parameters for each problem category. Boxplots and statistical tests will be done on all subcategories of parameters, to analyze how they behave on their respective problem instances and dynamics. Furthermore, it goes after the questions how and if a general purpose parameter set is even sensible.
+
+Part three focuses on validation of parameters. While its methods used are that of a "classical" metaheuristic analysis, borrowing from plots and metrics from [[6]](#6), it also tries to answer the papers general question, if hyperoptimization methods are suitable for metaheuristics (or at least HSPPBO), what good parameters for the algorithm might look like and if a general purpose parameter set is sensible.
+
+Additionally, with all the data gained throughout testing, a simple AI model (ideally with potential for feature importance analysis) will be trained to output an optimal parameter set given the properties of the problem instance, like size, coeff_var, qdc and eigenvalue.
 
 
 ## References
@@ -208,6 +239,8 @@ The parameter L will be set to a static value of 5 and not optimized.
 <a id='11'>[11]</a> S. Janson and M. Middendorf, “A hierarchical particle swarm opti- mizer for noisy and dynamic environments,” Genet. Program. Evolvable Mach., vol. 7, no. 4, pp. 329–354, 2006.
 
 <a id='12'>[12]</a> Peng Li and Hua Zhu. “Parameter selection for ant colony algorithm based on bacterial foraging algorithm”. In: Mathematical Problems in Engineering 2016 (2016).
+
+<a id='13'>[13]</a> Tim Head, "Comparing surrogate models". https://scikit-optimize.github.io/stable/auto_examples/strategy-comparison.html#sphx-glr-auto-examples-strategy-comparison-py, 2016.
 
 
 

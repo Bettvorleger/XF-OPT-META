@@ -132,7 +132,7 @@ def bayesian_search(func, params, conf, verbose=False, random_state=None, n_call
 
 def tree_regression(func, params, conf, verbose=False, random_state=None, n_calls=100):
     """
-    Sequential optimization using gradient boosted trees.
+    Sequential optimization using decision trees.
 
     Args:
         func: Objective function to optimize
