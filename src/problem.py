@@ -43,7 +43,7 @@ class Problem(ABC):
         TSP: Length of the given tour 
         """
         pass
-    
+
     @abstractmethod
     def get_heuristic_component(self):
         """
@@ -83,9 +83,3 @@ class Problem(ABC):
     @dimension.setter
     def dimension(self, value):
         self.dimension = value
-        
-
-
-    
-
-   

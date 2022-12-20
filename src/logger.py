@@ -4,13 +4,12 @@ from pathlib import Path
 from re import findall
 from functools import partial
 from datetime import datetime
-from config import logger_run_params
+from config import logger_run_params, output_folder_prefix
 import pandas as pd
-import numpy as np
 
 
 class Logger:
-    # specify run mode constants
+    # specify mode constants
     MODE_RUN = "run"
     MODE_EXPERIMENT = "exp"
     MODE_OPTIMIZE = "opt"
@@ -32,8 +31,7 @@ class Logger:
         """
         self.path = path
         self.mode = mode
-        self.path_prefix = {self.MODE_RUN: "run_",
-                            self.MODE_EXPERIMENT: "exp_", self.MODE_OPTIMIZE: "opt_"}
+        self.path_prefix = output_folder_prefix[mode]
         self.suffix_number = suffix_number
         if (suffix_number == 0):
             self.suffix_number = self.init_folder()
@@ -103,13 +101,13 @@ class Logger:
 
         for p in Path(self.path).iterdir():
             if p.is_dir:
-                num = findall(self.path_prefix[self.mode]+"(.*)", p.name)
+                num = findall(self.path_prefix+"(.*)", p.name)
                 if not num:
                     continue
                 num = int(num[0])
                 suffix_number = num if num > suffix_number else suffix_number
         suffix_number += 1
-        Path("".join((self.path, self.path_prefix[self.mode],
+        Path("".join((self.path, self.path_prefix,
              str(suffix_number), "/"))).mkdir(parents=True, exist_ok=True)
 
         return suffix_number
@@ -124,7 +122,7 @@ class Logger:
         Returns:
             TextIOWrapper: Wrapper for the opened logging file
         """
-        return open("".join((self.path, self.path_prefix[self.mode], str(self.suffix_number), "/", filename)), "a")
+        return open("".join((self.path, self.path_prefix, str(self.suffix_number), "/", filename)), "a")
 
     def set_info(self, info: dict):
         """
@@ -157,6 +155,7 @@ class Logger:
             run (int, optional): _description_. Defaults to 1.
         """
         # dump out all the data from the optimizer run
+        opt_results.func_vals = list(opt_results.func_vals)
         io_file = self.create_file_wrapper("opt_log_"+str(run)+".json")
         io_file.write(json.dumps(opt_results, indent=4, default=str))
         io_file.close()
@@ -199,7 +198,7 @@ class Logger:
         if run == 1:
             self.exp_run_list = [
                 [[] for j in range(len(self.run_list))] for i in range(len(self.run_params))]
-        #run_list_reversed = (pd.DataFrame(self.run_list).T).values.tolist()
+        # run_list_reversed = (pd.DataFrame(self.run_list).T).values.tolist()
         for i_key, i_val in enumerate(self.run_list):
             for p_key in range(len(self.run_params)):
                 self.exp_run_list[p_key][i_key].append(i_val[p_key])
@@ -215,8 +214,8 @@ class Logger:
     def create_exp_avg_run(self) -> None:
         io_file = self.create_file_wrapper("avg_run.csv")
         df = pd.DataFrame(self.exp_run_list, index=(self.run_params))
-        #df.iloc[[0]] = df.iloc[[0]].apply(lambda x: x[0])
-        #print(df.iloc[[0]])
+        # df.iloc[[0]] = df.iloc[[0]].apply(lambda x: x[0])
+        # print(df.iloc[[0]])
         df.to_csv(io_file)
         io_file.close()
 

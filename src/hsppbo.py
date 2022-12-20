@@ -47,6 +47,8 @@ class HSPPBO:
         self.reaction_type = reaction_type
         self.max_iteration_count = max_iteration_count
 
+        self.solution_quality_intervals = []
+
         self.fixed_rng = False
 
     def set_random_seed(self):
@@ -63,16 +65,22 @@ class HSPPBO:
             *args (optional): 
 
         Returns:
-            int: Best solution (tuple of path and length) found during the runtime of the algorithm.  
+            int: Average of best solution (tuple of path and length) found during the runtime of the algorithm.  
         """
 
         # set the params for the algorithm run
         for k, v in enumerate(args[0]):
             self.__dict__[params['opt']['hsppbo'][k][0]] = v
 
+        # for multiple runs, the tree and solution list need to be reset
         self.tree.reset()
-        i = self.execute()[1]
-        return i
+        self.solution_quality_intervals.clear()
+
+        self.execute()
+
+        # calc average of (best) solutions right before dynamic is triggered
+        avg_solution_quality = np.mean(self.solution_quality_intervals)
+        return avg_solution_quality
 
     def execute(self, verbose=False) -> tuple[list, int]:
         """
@@ -92,6 +100,8 @@ class HSPPBO:
             # check for dynamic change within the problem instance
             # if dynamic is triggered (true), recalculate the solution quality for each node
             if self.problem.check_dynamic_change(i):
+                self.solution_quality_intervals.append(self.tree.get_best_solution(self.tree.tree.root)[1])
+
                 for sce in range(0, self.sce_count):
                     pp_quality = self.problem.get_solution_quality(
                         self.tree.get_solution(sce)[0])
@@ -143,11 +153,13 @@ class HSPPBO:
                 print("Iteration: ", i, "\n")
                 self.tree.tree.show(data_property="pb_quality")
 
-            best_solution = self.tree.get_best_solution(self.tree.tree.root)[1]
+            best_solution_quality = self.tree.get_best_solution(self.tree.tree.root)[1]
             self.logger.log_iteration(
-                i, self.sce_count*(i+1), swap_count, detection_pause_count == 0, best_solution)
+                i, self.sce_count*(i+1), swap_count, detection_pause_count == 0, best_solution_quality)
 
         best_solution = self.tree.get_best_solution(self.tree.tree.root)
+        # append last solution quality - without dynamic, this is the only list entry
+        self.solution_quality_intervals.append(best_solution[1])
 
         if verbose:
             self.tree.tree.show(data_property="pb_quality")

@@ -9,7 +9,7 @@ import json
 from scipy.spatial import ConvexHull
 
 
-class TSP(Problem):    
+class TSP(Problem):
     dynamic = False
     TYPE = 'TSP'
 
@@ -336,8 +336,14 @@ class TSP(Problem):
             "name": self.instance.name,
             "dimension": self.dimension,
             "weight_type": self.instance.edge_weight_type,
-            "median_distance": self.get_median_distance(),
-            "average_distance": self.get_average_distance(),
+            "statistics": {
+                'mean': self.get_mean_distance(),
+                'median': self.get_median_distance(),
+                'coeff_var': self.get_coefficient_of_variation(),
+                'qdc': self.get_quartile_dispersion_coefficient(),
+                'R': self.get_regularity_index(),
+                'eigen1': self.get_first_eigenvalue()
+            },
             "dynamic_props": dynamic_props
         }
 
