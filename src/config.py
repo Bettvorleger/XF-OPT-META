@@ -11,6 +11,10 @@ params = {
             ('w_parent_best', Real(0.001, 0.99)),
             # ('detection_threshold', Real(0, 0.5)),
             # ('reaction_type', Categorical(['partial', 'full', 'none'])),
+        ],
+        "problem":
+        [
+            ('dynamic_intensity', 10, 25, 50),
         ]},
     "exp": {
         "hsppbo":

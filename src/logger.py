@@ -14,6 +14,8 @@ class Logger:
     MODE_EXPERIMENT = "exp"
     MODE_OPTIMIZE = "opt"
 
+    sub_folders = False
+
     def __init__(self, path="output/", mode=MODE_RUN, suffix_number=0, algorithm='hsppbo') -> None:
         """
         Create a logger instance for creating all relevant files for a given algorithm mode
@@ -23,9 +25,12 @@ class Logger:
             - MDOE_OPTIMIZE(opt):   creating a log of every optimizer run (raw output including models built and all parameters used)
                                     and a summary best parameter combinations for each run
 
+        Class variables:
+            test_dynamic (bool, optional):  Wether or not the logger should handle this a test of multiple problem dynamics, and save aggregated info. Defaults to None.
+
         Args:
             path (str, optional):           Path to the output folder relative to the script. Defaults to "output/".
-            mode (_type_, optional):        Setting the mode of the logger, changing its behaviour and created files. Defaults to MODE_RUN.
+            mode (str, optional):           Setting the mode of the logger, changing its behaviour and created files. Defaults to MODE_RUN.
             suffix_number (int, optional):  Folder suffix (e.g. run_1 for suffix 1) for the created folder. Can be manually set if needed. 
                                             Defaults to 0 for auto-detection of next greater number within the folder.
         """
@@ -49,6 +54,17 @@ class Logger:
         }
         self.init_mode = partial(modes[self.mode])
 
+    def init_dynamic(self, params: list, dynamic_num: int) -> None:
+        self.sub_folders = True
+        self.sub_name = 'dynamic_'
+        self.sub_num = 1
+        self.dynamic_params = params
+        self.folder_info = {}
+
+        for n in range(1, dynamic_num+1):
+            Path("".join((self.path, self.path_prefix, str(self.suffix_number), "/",
+                 self.sub_name, str(n), "/"))).mkdir(parents=True, exist_ok=True)
+
     def init_run(self) -> None:
         """
         Init the run logger mode
@@ -67,6 +83,8 @@ class Logger:
             runs (int): Max number of algorithm runs performed
         """
         self.max_runs = runs
+        for dp in self.dynamic_params:
+            self.info["problem"]["dynamic_props"][dp[0]] = dp[self.sub_num]
         self.create_info_log()
         self.run_io = self.create_file_wrapper("exp_run_1.csv")
         self.create_run_log_header()
@@ -84,6 +102,8 @@ class Logger:
         """
         self.params = params
         self.info["optimizer"] = opt_algo
+        for dp in self.dynamic_params:
+            self.info["problem"]["dynamic_props"][dp[0]] = dp[self.sub_num]
         self.create_info_log()
         self.best_params_list = []
 
@@ -112,7 +132,19 @@ class Logger:
 
         return suffix_number
 
-    def create_file_wrapper(self, filename: str) -> None:
+    def next_dynamic(self, dynamic_num, **param) -> None:
+        self.folder_info[self.sub_name + str(dynamic_num)] = {}
+        for k in param.keys():
+            self.folder_info[self.sub_name +
+                             str(dynamic_num)].setdefault(k, []).append(param[k])
+        self.create_folder_info_log()
+        self.sub_num += 1
+
+    def create_results(self) -> None:
+        results = {}
+        self.create_result_log(results)
+
+    def create_file_wrapper(self, filename: str, mode='a') -> None:
         """
         Initializes a file wrapper for logging
 
@@ -122,7 +154,9 @@ class Logger:
         Returns:
             TextIOWrapper: Wrapper for the opened logging file
         """
-        return open("".join((self.path, self.path_prefix, str(self.suffix_number), "/", filename)), "a")
+        if self.sub_folders:
+            return open("".join((self.path, self.path_prefix, str(self.suffix_number), "/", self.sub_name, str(self.sub_num), "/", filename)), mode)
+        return open("".join((self.path, self.path_prefix, str(self.suffix_number), "/", filename)), mode)
 
     def set_info(self, info: dict):
         """
@@ -133,12 +167,26 @@ class Logger:
         """
         self.info = info
 
+    def create_folder_info_log(self):
+        """
+        Create folder info about the relation between subdirectories and their respective parameters
+        """
+        io_file = self.create_file_wrapper("../folder_info.json", mode='w')
+        io_file.write(json.dumps(self.folder_info, indent=4, default=str))
+        io_file.close()
+
+    def create_result_log(self, results: dict):
+        """
+        Create folder info about the relation between subdirectories and their respective parameters
+        """
+        self.sub_folders = False
+        io_file = self.create_file_wrapper("results.json")
+        io_file.write(json.dumps(results, indent=4, default=str))
+        io_file.close()
+
     def create_info_log(self):
         """
         Create log about the current runtime environment and used parameters for the modules 
-
-        Args:
-            info (dict): info about all the algorithm components and parameters
         """
         io_file = self.create_file_wrapper("info.json")
         self.info['datetime'] = datetime.now()

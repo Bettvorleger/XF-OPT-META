@@ -74,6 +74,7 @@ class HSPPBO:
 
         # for multiple runs, the tree and solution list need to be reset
         self.tree.reset()
+        self.problem.reset()
         self.solution_quality_intervals.clear()
 
         self.execute()
@@ -114,7 +115,7 @@ class HSPPBO:
                 detection_pause_count += 1
 
             if (self.problem.dimension > 100):
-                with WorkerPool() as pool:
+                with WorkerPool(n_jobs=self.sce_count) as pool:
                     # call the same function with different data in parallel, pass the current iteration as partial function
                     for sce, solution in pool.map_unordered(partial(self.construct_solution, iteration=i), range(0, self.sce_count)):
                         solution_quality = self.problem.get_solution_quality(

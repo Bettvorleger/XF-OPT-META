@@ -29,9 +29,19 @@ class TSP(Problem):
             tsplib_name (str): Name of a standard TSPLIB95 instance, e.g. 'rat195'
             problem_path (str, optional): Path to the problem instances. Defaults to "../problems/tsp/".
         """
+        self.tsplib_name = tsplib_name
         self.problem_path = problem_path
         self.instance = tsplib95.load(self.problem_path+tsplib_name+'.tsp')
         self._dimension = self.instance.dimension
+        self.distance_matrix = self.get_distance_matrix()
+        self.recipr_dist_matrix = np.reciprocal(
+            self.distance_matrix, where=self.distance_matrix != 0)
+
+    def reset(self) -> None:
+        """
+        Reset the problem to its original state and recalculate the distance matrix
+        """
+        self.instance = tsplib95.load(self.problem_path+self.tsplib_name+'.tsp')
         self.distance_matrix = self.get_distance_matrix()
         self.recipr_dist_matrix = np.reciprocal(
             self.distance_matrix, where=self.distance_matrix != 0)

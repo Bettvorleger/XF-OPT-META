@@ -8,6 +8,13 @@ class Problem(ABC):
     """
 
     @abstractmethod
+    def reset(self) -> None:
+        """
+        Reset the problem to its original state and recalculate the distance matrix
+        """
+        pass
+
+    @abstractmethod
     def set_dynamic(self):
         """
         Set the dynamic parameters of the problem, if it's to be a dynamic problem

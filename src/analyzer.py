@@ -47,7 +47,7 @@ class Analyzer:
             if files:
                 for file in files:
                     if file.name == 'info.json':
-                        opt = self.get_optimizer_type(file.as_posix())
+                        opt = get_optimizer_type(file.as_posix())
                     elif 'opt_log' in file.name:
                         with open(file.as_posix(), 'r') as f:
                             log = json.load(
@@ -62,11 +62,14 @@ class Analyzer:
         plot.legend(loc="best", prop={'size': 6}, numpoints=1)
         plt.show()
 
-    def get_optimizer_type(self, path: str):
-        with open(path, 'r') as f:
-            info = json.load(f)
-            f.close()
-        return info['optimizer']
+    def create_optimizer_eval_plot(self, result_num: list[int]):
+        pass
+
+def get_optimizer_type(path: str):
+    with open(path, 'r') as f:
+        info = json.load(f)
+        f.close()
+    return info['optimizer']
 
 
 def create_problem_metadata(problem: Problem, metadata_filepath='../problems/metadata.json'):
