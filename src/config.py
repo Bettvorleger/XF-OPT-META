@@ -9,21 +9,21 @@ params = {
             ('w_pers_best', Real(0.001, 0.99)),
             ('w_pers_prev', Real(0.001, 0.99)),
             ('w_parent_best', Real(0.001, 0.99)),
-            # ('detection_threshold', Real(0, 0.5)),
-            # ('reaction_type', Categorical(['partial', 'full', 'none'])),
+            ('detection_threshold', Real(0.1, 0.5)),
+            ('reaction_type', Categorical(['partial', 'full'])),
         ],
         "problem":
         [
-            ('dynamic_intensity', 10, 25, 50),
+            ('dynamic_intensity', 0.1, 0.25, 0.5),
         ]},
     "exp": {
         "hsppbo":
         [
-            ('detection_threshold', 0.1, 0.25, 0.5)
+            #('detection_threshold', 0.1, 0.25, 0.5)
         ],
         "problem":
         [
-            ('dynamic_intensity', 10, 25, 50),
+            ('dynamic_intensity', 0.1, 0.25, 0.5),
         ]
     }
 }

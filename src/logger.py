@@ -61,6 +61,9 @@ class Logger:
         self.dynamic_params = params
         self.folder_info = {}
 
+        for dp in self.dynamic_params:
+            self.info["problem"]["dynamic_props"][dp[0]] = dp[self.sub_num]
+
         for n in range(1, dynamic_num+1):
             Path("".join((self.path, self.path_prefix, str(self.suffix_number), "/",
                  self.sub_name, str(n), "/"))).mkdir(parents=True, exist_ok=True)
@@ -83,8 +86,6 @@ class Logger:
             runs (int): Max number of algorithm runs performed
         """
         self.max_runs = runs
-        for dp in self.dynamic_params:
-            self.info["problem"]["dynamic_props"][dp[0]] = dp[self.sub_num]
         self.create_info_log()
         self.run_io = self.create_file_wrapper("exp_run_1.csv")
         self.create_run_log_header()
@@ -102,8 +103,6 @@ class Logger:
         """
         self.params = params
         self.info["optimizer"] = opt_algo
-        for dp in self.dynamic_params:
-            self.info["problem"]["dynamic_props"][dp[0]] = dp[self.sub_num]
         self.create_info_log()
         self.best_params_list = []
 

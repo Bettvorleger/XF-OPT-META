@@ -23,7 +23,7 @@ def user_input():
     parser.add_argument('-pt', '--problem-type', type=str, default='TSP',
                         help='Type of the problem, e.g. TSP (standard, symmetric TSP), ATSP (asymmetric TSP), QAP')
     parser.add_argument('-di', '--dynamic-intensity', type=check_percent_range,
-                        default=0.2, help='Instensity of the dynamic problem instance')
+                        default=0.25, help='Instensity of the dynamic problem instance')
     parser.add_argument('-opt', '--opt-algo', type=str, choices=[
                         'random', 'bayesian', 'forest', 'gradient'], default='bayesian', help='Algorithm used in optimization process')
     parser.add_argument('-oc', '--obj-calls', type=int, default=20,
@@ -85,10 +85,10 @@ def main():
 
     # set wether the problem is dynamic or not
     if args.dynamic_intensity > 0:
-        problem.set_dynamic(args.dynamic_intensity, min_iteration_count=200-1)
+        problem.set_dynamic(args.dynamic_intensity, min_iteration_count=2000-1)
 
     hsppbo = HSPPBO(problem, logger, args.personal_best, args.personal_previous, args.parent_best,
-                    args.alpha, args.beta, args.dynamic_detection_threshold, args.reaction_type, max_iteration_count=200)
+                    args.alpha, args.beta, args.dynamic_detection_threshold, args.reaction_type, max_iteration_count=2600)
 
     logger.set_info(hsppbo.get_info())
 
@@ -124,18 +124,22 @@ def main():
                     logger.close_run_logger()
                     logger.add_exp_run(n)
                 logger.create_exp_avg_run()
-                logger.next_dynamic(
-                    d, {params['exp']['problem'][0][0]: params['exp']['problem'][0][d]})
+                if args.test_dynamic:
+                    logger.next_dynamic(
+                        d, {params['exp']['problem'][0][0]: params['exp']['problem'][0][d]})
             logger.create_results()
 
         case 'opt':
             opt_algo = args.opt_algo
             hsppbo.set_random_seed()
+            logger.set_info(hsppbo.get_info())
 
             if args.test_dynamic:
                 dynamic_num = sum(
                     [len(p) for p in params['opt']['problem']]) - len(params['opt']['problem'])
                 logger.init_dynamic(params['opt']['problem'], dynamic_num)
+            else:
+                dynamic_num = 1
 
             n_runs = args.runs if args.runs != 0 else get_run_number()
             opt = Optimizer(opt_algo, hsppbo.execute_wrapper,
@@ -149,8 +153,9 @@ def main():
                                       n_calls=args.obj_calls, random_state=n)
                     logger.create_opt_files(opt_res, run=n)
                 logger.create_opt_best_params()
-                logger.next_dynamic(
-                    d, **{params['opt']['problem'][0][0]: params['opt']['problem'][0][d]})
+                if args.test_dynamic:
+                    logger.next_dynamic(
+                        d, **{params['opt']['problem'][0][0]: params['opt']['problem'][0][d]})
             logger.create_results()
 
 
