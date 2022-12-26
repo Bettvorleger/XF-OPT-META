@@ -43,8 +43,7 @@ logger_run_params = {
 optimizer_conf = {
     "bayesian": {
         'acq_func': 'PI',
-        'xi': 0.01,
-        'n_initial_points': 1,
+        'n_initial_points': 10,
         'initial_point_generator': 'hammersly',
         'noise': 0.07,
     },
