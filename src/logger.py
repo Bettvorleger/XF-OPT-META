@@ -1,5 +1,6 @@
 import timeit
 import json
+import dill as pickle
 from pathlib import Path
 from re import findall
 from functools import partial
@@ -202,6 +203,9 @@ class Logger:
             run (int, optional): _description_. Defaults to 1.
         """
         # dump out all the data from the optimizer run
+        io_file = self.create_file_wrapper("opt_log_"+str(run)+".pkl", mode='wb')
+        io_file.write(pickle.dumps(opt_results))
+
         opt_results.func_vals = list(opt_results.func_vals)
         io_file = self.create_file_wrapper("opt_log_"+str(run)+".json")
         io_file.write(json.dumps(opt_results, indent=4, default=str))

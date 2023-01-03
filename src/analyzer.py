@@ -1,11 +1,14 @@
 from typing import Generator
 from scipy.optimize import OptimizeResult
 from problem import Problem
-from config import output_folder_prefix
+from tsp import TSP
+from config import output_folder_prefix, params
 import json
 from pathlib import Path
+import dill as pickle
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+from skopt.space import Space, Integer, Real
 from skopt.plots import plot_convergence, plot_objective
 import plotly.express as px
 import matplotlib.pyplot as plt
@@ -20,10 +23,11 @@ class Analyzer:
     MODE_EXPERIMENT = "exp"
     MODE_OPTIMIZE = "opt"
 
-    def __init__(self, mode=MODE_RUN, results_path="output/") -> None:
+    def __init__(self, mode=MODE_RUN, obj_algorithm='hsppbo', results_path="output/") -> None:
         self.mode = mode
         self.path_prefix = output_folder_prefix[mode]
         self.results_path = results_path
+        self.obj_algorithm = obj_algorithm
 
     def load_result_folder(self, result_num) -> Generator[Path, None, None]:
         path = "".join(
@@ -37,39 +41,87 @@ class Analyzer:
         # rpd_list = [((x[4] - optimal_solution) / optimal_solution) for x in self.log_list]
         # time_list =  [x[1] for x in self.log_list]
 
-    def create_optimizer_convergence_plot(self, result_nums: list[int]):
+    def create_convergence_plot(self, result_nums: list[int]):
 
         results = []
+        opt_solution = None
+        opt = ""
         for n in result_nums:
-            opt = ""
             res = []
+
+            # load IO wrapper for accesing files from run
             files = self.load_result_folder(n)
             if files:
                 for file in files:
                     if file.name == 'info.json':
                         opt = get_optimizer_type(file.as_posix())
-                    elif 'opt_log' in file.name:
+                        opt_solution = get_optimal_solution(file.as_posix())
+                    elif 'opt_log' and 'json' in file.name:
                         with open(file.as_posix(), 'r') as f:
                             log = json.load(
                                 f, object_hook=lambda d: OptimizeResult(**d))
                             f.close()
-                        log.func_vals = np.array(log.func_vals)
+                            if opt_solution:
+                                log.func_vals = np.array(
+                                    [(x-opt_solution)/opt_solution for x in log.func_vals])
+                            else:
+                                log.func_vals = np.array(log.func_vals)
                         res.append(log)
                 results.append((opt, res))
 
-        plot = plot_convergence(*results, true_minimum=7542)
+        if results:
+            plot = plot_convergence(*results)
+            if opt_solution:
+                plot.set_ylim([-0.02, 0.25])
+            plot.legend(loc="best", prop={'size': 8}, numpoints=1)
+            plt.show()
 
-        plot.legend(loc="best", prop={'size': 6}, numpoints=1)
+    def create_partial_dep_plot(self, result_num: int, n_points=40):
+        results = []
+        problem = ""
+        opt_solution = None
+        opt = ""
+
+        # load IO wrapper for accesing files from run
+        files = self.load_result_folder(result_num)
+        if files:
+            for file in files:
+                if file.name == 'info.json':
+                    problem = get_problem_name(file.as_posix())
+                    opt = get_optimizer_type(file.as_posix())
+                    opt_solution = get_optimal_solution(file.as_posix())
+                elif 'opt_log' and 'pkl' in file.name:
+                    with open(file.as_posix(), 'rb') as f:
+                        log = pickle.load(f)
+                        f.close()
+                    results.append(log)
+
+        dimensions = [d[0] for d in params[self.mode][self.obj_algorithm]]
+        for i, res in enumerate(results):
+            plot_objective(res, dimensions=dimensions, n_points=n_points)
+            plt.suptitle('Partial Dependence (opt_%d, %s, %s, run %d of %d)' %
+                         (result_num, opt, problem, i, len(results)))
         plt.show()
 
-    def create_optimizer_eval_plot(self, result_num: list[int]):
-        pass
 
-def get_optimizer_type(path: str):
+def get_optimizer_type(path: str) -> str:
     with open(path, 'r') as f:
         info = json.load(f)
         f.close()
     return info['optimizer']
+
+
+def get_problem_name(path: str) -> str:
+    with open(path, 'r') as f:
+        info = json.load(f)
+        f.close()
+    return info['problem']['name']
+
+
+def get_optimal_solution(path: str) -> int:
+    problem = get_problem_name(path)
+    p = TSP(problem, load_instance=False)
+    return p.get_optimal_solution()
 
 
 def create_problem_metadata(problem: Problem, metadata_filepath='../problems/metadata.json'):

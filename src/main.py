@@ -62,8 +62,11 @@ def check_percent_range(number: float) -> float:
 
 # TODO code:
 #   - all modes: add relative difference to optimal solution to every output
-#   - implement analyzer module
-
+#   - analyzer: 
+#       - comparing opt methods (convergence plot)
+#       - comparing opt params (boxplots, statistical significance tests, partial dependence plot)
+#       - comparing exp runs (avg run analysis)
+ 
 # TODO code(optional):
 #   - implement tests
 #   - web UI (flask) and better packaging\
@@ -78,7 +81,7 @@ def main():
     logger = Logger(mode=args.mode)
 
     if (args.problem_type == 'TSP'):
-        problem = TSP(tsplib_name=args.problem)
+        problem = TSP(tsp_name=args.problem)
     else:
         raise NotImplementedError(
             'Problem type not implemented yet')

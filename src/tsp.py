@@ -21,7 +21,7 @@ class TSP(Problem):
     tsplib95.distances.TYPES["ATT"] = partial(
         tsplib95.distances.euclidean, round=lambda x: x)
 
-    def __init__(self, tsplib_name: str, problem_path="../problems/tsp/") -> None:
+    def __init__(self, tsp_name: str, problem_path="../problems/tsp/", load_instance=True) -> None:
         """
         Creates a problem instance of a standard TSPLIB95 problem
 
@@ -29,19 +29,20 @@ class TSP(Problem):
             tsplib_name (str): Name of a standard TSPLIB95 instance, e.g. 'rat195'
             problem_path (str, optional): Path to the problem instances. Defaults to "../problems/tsp/".
         """
-        self.tsplib_name = tsplib_name
+        self.tsp_name = tsp_name
         self.problem_path = problem_path
-        self.instance = tsplib95.load(self.problem_path+tsplib_name+'.tsp')
-        self._dimension = self.instance.dimension
-        self.distance_matrix = self.get_distance_matrix()
-        self.recipr_dist_matrix = np.reciprocal(
-            self.distance_matrix, where=self.distance_matrix != 0)
+        if load_instance:
+            self.instance = tsplib95.load(self.problem_path+tsp_name+'.tsp')
+            self._dimension = self.instance.dimension
+            self.distance_matrix = self.get_distance_matrix()
+            self.recipr_dist_matrix = np.reciprocal(
+                self.distance_matrix, where=self.distance_matrix != 0)
 
     def reset(self) -> None:
         """
         Reset the problem to its original state and recalculate the distance matrix
         """
-        self.instance = tsplib95.load(self.problem_path+self.tsplib_name+'.tsp')
+        self.instance = tsplib95.load(self.problem_path+self.tsp_name+'.tsp')
         self.distance_matrix = self.get_distance_matrix()
         self.recipr_dist_matrix = np.reciprocal(
             self.distance_matrix, where=self.distance_matrix != 0)
@@ -159,7 +160,8 @@ class TSP(Problem):
         try:
             with open(self.problem_path+'../metadata.json', 'r') as f:
                 metadata = json.load(f)
-                return metadata["tsp"]["tsplib"]["stsp"][self.instance.name]['optimal']
+                f.close()
+            return metadata["tsp"]["stsp"][self.tsp_name]['optimal']
         except:
             return None
 
