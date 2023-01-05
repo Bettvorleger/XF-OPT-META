@@ -61,18 +61,18 @@ def check_percent_range(number: float) -> float:
     return number
 
 # TODO code:
-#   - all modes: add relative difference to optimal solution to every output
+#   - all modes: add relative difference to optimal solution to run and exp output
 #   - analyzer: 
 #       - comparing opt methods (convergence plot)
-#       - comparing opt params (boxplots, statistical significance tests, partial dependence plot)
+#       - comparing opt params (boxplots, partial dependence plot, variance_inflation_factor, importance via PCA https://betterdatascience.com/feature-importance-python/)
 #       - comparing exp runs (avg run analysis)
  
 # TODO code(optional):
 #   - implement tests
-#   - web UI (flask) and better packaging\
+#   - web UI (flask) and better packaging
 
 # TODO thesis:
-#   - how does optimizer handle categorial values?
+#   - how does optimizer handle categorial values? -> onehot and label encoding (onehot used)
 
 
 def main():
@@ -114,7 +114,7 @@ def main():
 
             for d in range(1, dynamic_num+1):
                 problem.set_dynamic(
-                    dynamic_intensity=params['exp']['problem'][0][d])
+                    dynamic_intensity_pct=params['exp']['problem'][0][d])
                 logger.init_mode(n_runs)
 
                 for n in range(1, n_runs+1):
@@ -130,7 +130,6 @@ def main():
                 if args.test_dynamic:
                     logger.next_dynamic(
                         d, {params['exp']['problem'][0][0]: params['exp']['problem'][0][d]})
-            logger.create_results()
 
         case 'opt':
             opt_algo = args.opt_algo
@@ -159,7 +158,6 @@ def main():
                 if args.test_dynamic:
                     logger.next_dynamic(
                         d, **{params['opt']['problem'][0][0]: params['opt']['problem'][0][d]})
-            logger.create_results()
 
 
 def get_run_number() -> int:

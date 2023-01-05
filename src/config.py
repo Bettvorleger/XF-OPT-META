@@ -36,6 +36,8 @@ MODE_OPTIMIZE = "opt"
 output_folder_prefix = {MODE_RUN: "run_",
                         MODE_EXPERIMENT: "exp_", MODE_OPTIMIZE: "opt_"}
 
+subfolder_prefix = 'dynamic_'
+
 logger_run_params = {
     "hsppbo": ["iteration", "abs_runtime", "func_evals", "swaps", "reaction", "best_solution"]
 }

@@ -47,7 +47,7 @@ class TSP(Problem):
         self.recipr_dist_matrix = np.reciprocal(
             self.distance_matrix, where=self.distance_matrix != 0)
 
-    def set_dynamic(self, dynamic_intensity=0.2, dynamic_frequency=100, min_iteration_count=2000-1) -> None:
+    def set_dynamic(self, dynamic_intensity_pct=0.2, dynamic_frequency=100, min_iteration_count=2000-1) -> None:
         """
         Apply dynamic properties to the TSP, making it a dynamic TSP
 
@@ -55,8 +55,9 @@ class TSP(Problem):
             dynamic_intensity (float, optional): Percantage of how much is going to change relative to the cities. Defaults to 0.2.
             dynamic_frequency (int, optional): After how many iterations a change occurs. Defaults to 100.
         """
+        self.dynamic_intensity_pct = dynamic_intensity_pct
         self.dynamic_intensity = int(ceil(
-            dynamic_intensity * self.dimension))  # How many cities are going to change per dynamic call
+            dynamic_intensity_pct * self.dimension))  # How many cities are going to change per dynamic call
 
         # for dynamic TSP the cities are swaped in pairs, so the intensity needs to be even
         if self.dynamic_intensity % 2 != 0:
@@ -340,7 +341,7 @@ class TSP(Problem):
         if self.dynamic:
             dynamic_props = {
                 "dynamic_frequency": self.dynamic_frequency,
-                "dynamic_intensity": self.dynamic_intensity,
+                "dynamic_intensity": self.dynamic_intensity_pct,
                 "min_iterations_before_dynamic": self.min_iteration_count
             }
         return {
@@ -363,7 +364,7 @@ class TSP(Problem):
         dynamic_props = ""
         if self.dynamic:
             dynamic_props = "Dynamic Frequency: %s, Dynamic Intensity: %d, Minimum Iterations before Dynamic: %s\n" % (
-                self.dynamic_frequency, self.dynamic_intensity, self.min_iteration_count)
+                self.dynamic_frequency, self.dynamic_intensity_pct, self.min_iteration_count)
         return "\nType: Symmetric TSP, Name: %s, Dimension: %s, Weight Type: %s\n" % (self.instance.name, self.dimension, self.instance.edge_weight_type) + dynamic_props
 
     __repr__ = __str__

@@ -5,7 +5,7 @@ from pathlib import Path
 from re import findall
 from functools import partial
 from datetime import datetime
-from config import logger_run_params, output_folder_prefix
+from config import logger_run_params, output_folder_prefix, subfolder_prefix
 import pandas as pd
 
 
@@ -56,8 +56,15 @@ class Logger:
         self.init_mode = partial(modes[self.mode])
 
     def init_dynamic(self, params: list, dynamic_num: int) -> None:
+        """
+        Initialize the variables and sub-folders needed for a test of multiple dynamics.
+
+        Args:
+            params (list): Params that are to be tested 
+            dynamic_num (int): Number of different dynamic configs to be tested
+        """
         self.sub_folders = True
-        self.sub_name = 'dynamic_'
+        self.sub_name = subfolder_prefix
         self.sub_num = 1
         self.dynamic_params = params
         self.folder_info = {}
@@ -132,17 +139,21 @@ class Logger:
 
         return suffix_number
 
-    def next_dynamic(self, dynamic_num, **param) -> None:
+    def next_dynamic(self, dynamic_num: int, **param) -> None:
+        """
+        Create the folder information for the subfolders and its corresponding dynamic parameters.
+        Then, move to next iteration and its subfolder.
+
+        Args:
+            dynamic_num (int): Number of the current dynamic iteration
+            param (dict): dicts of lists of used dynamic configuration for current dynamic num
+        """
         self.folder_info[self.sub_name + str(dynamic_num)] = {}
         for k in param.keys():
             self.folder_info[self.sub_name +
                              str(dynamic_num)].setdefault(k, []).append(param[k])
         self.create_folder_info_log()
         self.sub_num += 1
-
-    def create_results(self) -> None:
-        results = {}
-        self.create_result_log(results)
 
     def create_file_wrapper(self, filename: str, mode='a') -> None:
         """
@@ -175,15 +186,6 @@ class Logger:
         io_file.write(json.dumps(self.folder_info, indent=4, default=str))
         io_file.close()
 
-    def create_result_log(self, results: dict):
-        """
-        Create folder info about the relation between subdirectories and their respective parameters
-        """
-        self.sub_folders = False
-        io_file = self.create_file_wrapper("results.json")
-        io_file.write(json.dumps(results, indent=4, default=str))
-        io_file.close()
-
     def create_info_log(self):
         """
         Create log about the current runtime environment and used parameters for the modules 
@@ -203,7 +205,8 @@ class Logger:
             run (int, optional): _description_. Defaults to 1.
         """
         # dump out all the data from the optimizer run
-        io_file = self.create_file_wrapper("opt_log_"+str(run)+".pkl", mode='wb')
+        io_file = self.create_file_wrapper(
+            "opt_log_"+str(run)+".pkl", mode='wb')
         io_file.write(pickle.dumps(opt_results))
 
         opt_results.func_vals = list(opt_results.func_vals)
