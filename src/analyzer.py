@@ -10,6 +10,8 @@ from sklearn.preprocessing import StandardScaler
 from skopt.space import Space, Integer, Real
 from skopt.plots import plot_convergence, plot_objective
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -51,36 +53,96 @@ class Analyzer:
         io_file.write(json.dumps(results, indent=4, default=str))
         io_file.close()
 
-    def create_convergence_plot(self, result_nums: list[int]):
+    def create_param_boxplot(self, result_nums: list[int], cmp='optimizer', paths_dict=None):
+        """
+        Create a boxplot over the parameters used during the optimization process (here alpha, beta, the three weight and the detection threshold).
+        Also, the mode of comparison can be changed, so different optimizers, problems or dynamics can be compared.
+
+        Args:
+            result_nums (list[int]): List of the folder suffixes to be processed, e.g. [5,6] for opt_5 and opt_6.
+            cmp (str, optional): Comparison identifier to compare the results against, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'optimizer'.
+            paths_dict (dict, optional): Dict to provide the path of the needed data directly, instead of iterating over results. Used for recursion only. Defaults to None.
+        """
+
+        results = pd.DataFrame()
+
+        if paths_dict:
+            folder = paths_dict
+            res = load_opt_best_params(folder['opt_best_params.csv'])
+            info = get_info(folder['info.json'])
+            key = get_comparison_parameter(cmp, info)
+            res['cmp'] = key
+            return res
+
+        for n in result_nums:
+            # load folder dict and the relevant contents
+            folder = self.load_result_folder(n)
+
+            if 'sub' in folder:
+                for sub_paths in folder.keys():
+                    if type(folder[sub_paths]) is dict:
+                        res = self.create_param_boxplot(
+                            [n], cmp=cmp, paths_dict=folder[sub_paths])
+                        results = pd.concat(
+                            [results, res], ignore_index=True, sort=False)
+            else:
+                res = load_opt_best_params(folder['opt_best_params.csv'])
+                info = get_info(folder['info.json'])
+                key = get_comparison_parameter(cmp, info)
+                res['cmp'] = key
+                results = pd.concat(
+                    [results, res], ignore_index=True, sort=False)
+
+        fig = make_subplots(shared_yaxes=True, rows=2,
+                            cols=1, subplot_titles=('Parameter Boxplot (%s comparison over runs {%s})' %
+                                                    (cmp, ",".join(str(x) for x in result_nums)), 'Parameter Boxplot (%s comparison over runs {%s})' %
+                                                    (cmp, ",".join(str(x) for x in result_nums))))
+        fig1 = px.box(results, y=["alpha", "beta"],
+                      color="cmp" if cmp else None, points="all")
+        fig2 = px.box(results, y=[
+                      'w_pers_best', 'w_pers_prev', 'w_parent_best'], color="cmp" if cmp else None, points="all")
+
+        for f in fig1['data']:
+            fig.add_trace(go.Box(f, showlegend=False), row=1, col=1)
+        for f in fig2['data']:
+            fig.add_trace(go.Box(f), row=2, col=1)
+
+        fig.update_layout(legend_title_text=cmp, boxmode='group')
+        fig.show()
+
+    def create_convergence_plot(self, result_nums: list[int], paths_dict=None):
+        """
+        Plot one or several convergence traces for each optimization method used, aggregating over all results provided.
+
+        Args:
+            result_nums (list[int]): List of the result folder suffixes to be processed, e.g. [5,6] for opt_5 and opt_6.
+            paths_dict (dict, optional): Dict to provide the path of the needed data directly, instead of iterating over results. Used for recursion only. Defaults to None.
+        """
 
         results = []
         opt_solution = None
-        opt = ""
+
+        if paths_dict:
+            folder = paths_dict
+            opt_solution = get_optimal_solution(folder['info.json'])
+            opt = get_optimizer_type(folder['info.json'])
+            return (opt, load_opt_result(folder, pickled=False))
+
         for n in result_nums:
-            res = []
 
             # load IO wrapper for accesing files from run
             folder = self.load_result_folder(n)
 
             if 'sub' in folder:
-                return
-
-            opt = get_optimizer_type(folder['info.json'])
-            opt_solution = get_optimal_solution(folder['info.json'])
-
-            for k, v in folder.items():
-                if 'opt_log' in k and 'json' in k:
-                    with open(v, 'r') as f:
-                        log = json.load(
-                            f, object_hook=lambda d: OptimizeResult(**d))
-                        f.close()
-                        if opt_solution:
-                            log.func_vals = np.array(
-                                [(x-opt_solution)/opt_solution for x in log.func_vals])
-                        else:
-                            log.func_vals = np.array(log.func_vals)
-                    res.append(log)
-            results.append((opt, res))
+                for sub_paths in folder.keys():
+                    if type(folder[sub_paths]) is dict:
+                        results.append(self.create_convergence_plot(
+                            [n], paths_dict=folder[sub_paths]))
+            else:
+                opt_solution = get_optimal_solution(folder['info.json'])
+                opt = get_optimizer_type(folder['info.json'])
+                results.append(
+                    (opt, load_opt_result(folder, pickled=False)))
 
         if results:
             plot = plot_convergence(*results)
@@ -89,16 +151,35 @@ class Analyzer:
             plot.legend(loc="best", prop={'size': 8}, numpoints=1)
             plt.show()
 
-    def create_partial_dep_plot(self, result_num=0, paths_dict=None, n_points=40):
+    def create_partial_dep_plot(self, result_num: int, paths_dict=None, n_points=40):
+        """
+        Plot a 2-d matrix with so-called Partial Dependence plots of the objective function. 
+        This shows the influence of each search-space dimension on the objective function.
+
+        The diagonal shows the effect of a single dimension on the objective function,
+        while the plots below the diagonal show the effect on the objective function when varying two dimensions.
+
+        The Partial Dependence is calculated by averaging the objective value for a number of random samples in the search-space,
+        while keeping one or two dimensions fixed at regular intervals.
+        This averages out the effect of varying the other dimensions and shows the influence of one or two dimensions on the objective function.
+
+        Note:
+        The Partial Dependence plot is only an estimation of the surrogate model which in turn is only an estimation of the true objective function that has been optimized
+        
+        Args:
+            result_num (int, optional): Result folder suffix to process.
+            paths_dict (_type_, optional): Dict to provide the path of the needed data directly, instead of iterating over results. Used for recursion only. Defaults to None.
+            n_points (int, optional): Number of points at which to evaluate the partial dependence along each dimension. Defaults to 40.
+        """
         results = []
-        if not paths_dict:
+
+        if paths_dict:
+            folder = paths_dict
+        else:
             # load IO wrapper for accessing files from run
             folder = self.load_result_folder(result_num)
-        else:
-            folder = paths_dict
 
         if 'sub' in folder:
-            folder.pop('sub')
             for sub_paths in folder.keys():
                 if type(folder[sub_paths]) is dict:
                     self.create_partial_dep_plot(
@@ -110,12 +191,7 @@ class Analyzer:
         dynamic_intensity = info['problem']['dynamic_props']['dynamic_intensity']
         opt = get_optimizer_type(folder['info.json'])
 
-        for k, v in folder.items():
-            if 'opt_log' and 'pkl' in k:
-                with open(v, 'rb') as f:
-                    log = pickle.load(f)
-                    f.close()
-                results.append(log)
+        results = load_opt_result(folder)
 
         dimensions = [d[0] for d in params[self.mode][self.obj_algorithm]]
         for i, res in enumerate(results):
@@ -162,6 +238,83 @@ class Analyzer:
             TextIOWrapper: Wrapper for the opened logging file
         """
         return open("".join(self.results_path, self.path_prefix, str(result_num), '/', filename), mode)
+
+
+def load_opt_best_params(path: str) -> pd.DataFrame:
+    try:
+        df = pd.read_csv(path, sep=';')
+        df = df.loc[:, ~df.columns.isin(['run', 'func_val'])]
+    except:
+        raise FileExistsError(
+            'File "opt_best_params.csv" not found in current folder')
+
+    return df
+
+
+def load_opt_result(folder: dict, pickled=True) -> list[OptimizeResult]:
+    """
+    Load the results of the optimizing runs, generally being of the OptimizeResult class
+
+    Args:
+        folder (dict):              Dict of the filenames and their locations
+        pickled (bool, optional):   If the results are provided in a pickled or unpickled form.
+                                    Pickled preferred, json eventually deprecated. Defaults to True.
+
+    Returns:
+        list[OptimizeResult]: List of OptimizeResult classes, being results of optimization runs
+    """
+
+    res = []
+
+    opt_solution = get_optimal_solution(folder['info.json'])
+
+    for k, v in folder.items():
+        if 'opt_log' in k and 'pkl' in k and pickled:
+            with open(v, 'rb') as f:
+                log = pickle.load(f)
+                f.close()
+            res.append(log)
+        if 'opt_log' in k and 'json' in k and not pickled:
+            with open(v, 'r') as f:
+                log = json.load(
+                    f, object_hook=lambda d: OptimizeResult(**d))
+                f.close()
+                if opt_solution:
+                    log.func_vals = np.array(
+                        [(x-opt_solution)/opt_solution for x in log.func_vals])
+                else:
+                    log.func_vals = np.array(log.func_vals)
+            res.append(log)
+
+    return res
+
+
+def get_comparison_parameter(cmp: str, info: dict) -> str:
+    """
+    Returns the corresponding info for the provided comparison identifier to add to the data.
+
+    Args:
+        cmp (str): Comparison identifier to compare the results against
+        info (dict): The meta info of the run currently processed
+
+    Raises:
+        ValueError: Raised if value for cmp is not "optimizer","dynamic","problem" or None
+
+    Returns:
+        str: Comparable info about the current run, e.g. the optimizer type, the dynamic intensity used or the problem.
+    """
+    if cmp is None:
+        key = ''
+    elif cmp == 'optimizer':
+        key = info['optimizer']
+    elif cmp == 'dynamic':
+        key = info['problem']['dynamic_props']['dynamic_intensity']
+    elif cmp == 'problem':
+        key = info['problem']['name']
+    else:
+        raise ValueError(
+            'Invalid value for parameter cmp. Chose from ["optimizer","dynamic","problem" or None]')
+    return key
 
 
 def get_optimizer_type(path: str) -> str:
