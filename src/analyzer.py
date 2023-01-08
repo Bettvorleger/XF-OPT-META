@@ -93,14 +93,22 @@ class Analyzer:
                 results = pd.concat(
                     [results, res], ignore_index=True, sort=False)
 
-        fig = make_subplots(shared_yaxes=True, rows=2,
-                            cols=1, subplot_titles=('Parameter Boxplot (%s comparison over runs {%s})' %
+        print(results)
+
+        y1 = ["alpha", "beta"]
+        y2 = ['w_pers_best', 'w_pers_prev', 'w_parent_best']
+        if 'detection_threshold' in results.columns:
+            y2.append('detection_threshold')
+
+        fig = make_subplots(shared_yaxes=True, 
+                            rows=2, 
+                            cols=1, 
+                            subplot_titles=('Parameter Boxplot (%s comparison over runs {%s})' %
                                                     (cmp, ",".join(str(x) for x in result_nums)), 'Parameter Boxplot (%s comparison over runs {%s})' %
                                                     (cmp, ",".join(str(x) for x in result_nums))))
-        fig1 = px.box(results, y=["alpha", "beta"],
+        fig1 = px.box(results, y=y1,
                       color="cmp" if cmp else None, points="all")
-        fig2 = px.box(results, y=[
-                      'w_pers_best', 'w_pers_prev', 'w_parent_best'], color="cmp" if cmp else None, points="all")
+        fig2 = px.box(results, y=y2, color="cmp" if cmp else None, points="all")
 
         for f in fig1['data']:
             fig.add_trace(go.Box(f, showlegend=False), row=1, col=1)
@@ -165,7 +173,7 @@ class Analyzer:
 
         Note:
         The Partial Dependence plot is only an estimation of the surrogate model which in turn is only an estimation of the true objective function that has been optimized
-        
+
         Args:
             result_num (int, optional): Result folder suffix to process.
             paths_dict (_type_, optional): Dict to provide the path of the needed data directly, instead of iterating over results. Used for recursion only. Defaults to None.
