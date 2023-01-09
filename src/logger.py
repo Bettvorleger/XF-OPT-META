@@ -266,11 +266,10 @@ class Logger:
             self.run_list.clear()
 
     def create_exp_avg_run(self) -> None:
-        io_file = self.create_file_wrapper("avg_run.csv")
-        df = pd.DataFrame(self.exp_run_list, index=(self.run_params))
-        # df.iloc[[0]] = df.iloc[[0]].apply(lambda x: x[0])
-        # print(df.iloc[[0]])
-        df.to_csv(io_file)
+        io_file = self.create_file_wrapper("avg_run.pkl", mode='wb')
+        df = pd.DataFrame(self.exp_run_list, index=(self.run_params)).T
+        df['iteration'] = [x[0] for x in df['iteration'].values]
+        df.to_pickle(io_file)
         io_file.close()
 
     def create_run_log_header(self) -> None:

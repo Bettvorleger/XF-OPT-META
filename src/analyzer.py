@@ -53,9 +53,80 @@ class Analyzer:
         io_file.write(json.dumps(results, indent=4, default=str))
         io_file.close()
 
+    def create_run_plot(self, result_nums: list[int], cmp='dynamic', aggr='problem', iteration_range=[1950, 2300], paths_dict=None):
+        """
+        Create a line plot over the quality of the current best solution over custom iteration range.
+        Also, the mode of comparison and aggregation can be changed, so different optimizers, problems or dynamics can be compared and viewed in subplots.
+
+        Args:
+            result_nums (list[int]): List of the folder suffixes to be processed, e.g. [5,6] for exp_5 and exp_6.
+            cmp (str, optional): Comparison identifier to compare the results against, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'dynamic'.
+            aggr (str, optional): Aggregation identifier to make subplots the results for each group, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'problem'.
+            paths_dict (dict, optional): Dict to provide the path of the needed data directly, instead of iterating over results. Used for recursion only. Defaults to None.
+
+        Raises:
+            NotImplementedError: _description_
+        """
+        results = {}
+        for n in result_nums:
+            # load folder dict and the relevant contents
+            folder = self.load_result_folder(n)
+
+            if self.mode == self.MODE_RUN:
+                res = load_run(folder['run.csv'])
+            elif self.mode == self.MODE_EXPERIMENT:
+                res = load_avg_run(folder['avg_run.pkl'])
+                res['best_solution'] = res['best_solution'].apply(np.mean)
+            else:
+                raise NotImplementedError(
+                    "The mode %s currently does not support a run plot." % self.mode)
+
+            info = get_info(folder['info.json'])
+            res['cmp'] = get_key_parameter(cmp, info)
+            opt_solution = get_optimal_solution(folder['info.json'])
+            if opt_solution:
+                res['best_solution'] = res['best_solution'].subtract(
+                    opt_solution).divide(opt_solution)
+            # append or create list for current aggregation key
+            results.setdefault(get_key_parameter(aggr, info), []).append(res)
+
+        fig = make_subplots(shared_xaxes=True, vertical_spacing=0.05,
+                            rows=len(results), cols=1,
+                            subplot_titles=(list(results.keys())))
+        count = 1
+        for res in results.values():
+            res = pd.concat([r for r in res], ignore_index=True, sort=False)
+            res = res.loc[(res['iteration'] < iteration_range[1]) &
+                          (res['iteration'] >= iteration_range[0])]
+            fe = px.line(res, x="iteration", y="best_solution", color="cmp" if cmp else None,
+                         category_orders={"cmp": sorted(res['cmp'].unique())})
+            for f in fe['data']:
+                fig.add_trace(go.Scatter(f, showlegend=True if count == 1 else False,
+                              legendgroup='group'), row=count, col=1)
+            count += 1
+
+        fig.update_annotations(font_size=14)
+        fig.update_layout(legend_title_text=cmp, font_size=11, boxmode='group')
+        fig.update_layout(
+            title={
+                'text': 'Quality of current best solution over iterations, shown for different %ss<br>(%s comparison over runs {%s})' %
+                (aggr, cmp, ",".join(str(x) for x in result_nums)),
+                'y': 0.95,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top'}
+        )
+
+        # results = pd.concat([r for r in results], ignore_index=True, sort=False)
+        # results = results.loc[(results['iteration'] < 2300) & (results['iteration'] >= 1950)]
+        # print(results)
+        # fig = px.line(results, x="iteration", y="best_solution", color='cmp')
+
+        fig.show()
+
     def create_param_boxplot(self, result_nums: list[int], cmp='optimizer', paths_dict=None):
         """
-        Create a boxplot over the parameters used during the optimization process (here alpha, beta, the three weight and the detection threshold).
+        Create a boxplot over the best parameter sets found during during the optimization process (here alpha, beta, the three weight and the detection threshold).
         Also, the mode of comparison can be changed, so different optimizers, problems or dynamics can be compared.
 
         Args:
@@ -63,14 +134,13 @@ class Analyzer:
             cmp (str, optional): Comparison identifier to compare the results against, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'optimizer'.
             paths_dict (dict, optional): Dict to provide the path of the needed data directly, instead of iterating over results. Used for recursion only. Defaults to None.
         """
-
         results = pd.DataFrame()
 
         if paths_dict:
             folder = paths_dict
             res = load_opt_best_params(folder['opt_best_params.csv'])
             info = get_info(folder['info.json'])
-            key = get_comparison_parameter(cmp, info)
+            key = get_key_parameter(cmp, info)
             res['cmp'] = key
             return res
 
@@ -88,7 +158,7 @@ class Analyzer:
             else:
                 res = load_opt_best_params(folder['opt_best_params.csv'])
                 info = get_info(folder['info.json'])
-                key = get_comparison_parameter(cmp, info)
+                key = get_key_parameter(cmp, info)
                 res['cmp'] = key
                 results = pd.concat(
                     [results, res], ignore_index=True, sort=False)
@@ -100,22 +170,94 @@ class Analyzer:
         if 'detection_threshold' in results.columns:
             y2.append('detection_threshold')
 
-        fig = make_subplots(shared_yaxes=True, 
-                            rows=2, 
-                            cols=1, 
-                            subplot_titles=('Parameter Boxplot (%s comparison over runs {%s})' %
-                                                    (cmp, ",".join(str(x) for x in result_nums)), 'Parameter Boxplot (%s comparison over runs {%s})' %
-                                                    (cmp, ",".join(str(x) for x in result_nums))))
+        fig = make_subplots(shared_yaxes=True,
+                            rows=2, cols=1, vertical_spacing=0.1)
         fig1 = px.box(results, y=y1,
-                      color="cmp" if cmp else None, points="all")
-        fig2 = px.box(results, y=y2, color="cmp" if cmp else None, points="all")
+                      color="cmp" if cmp else None, points="all", category_orders={"cmp": sorted(res['cmp'].unique())})
+        fig2 = px.box(
+            results, y=y2, color="cmp" if cmp else None, points="all", category_orders={"cmp": sorted(res['cmp'].unique())})
 
         for f in fig1['data']:
-            fig.add_trace(go.Box(f, showlegend=False), row=1, col=1)
+            fig.add_trace(go.Box(f, showlegend=False,
+                          legendgroup='group'), row=1, col=1)
         for f in fig2['data']:
-            fig.add_trace(go.Box(f), row=2, col=1)
+            fig.add_trace(go.Box(f, legendgroup='group'), row=2, col=1)
 
         fig.update_layout(legend_title_text=cmp, boxmode='group')
+        fig.update_layout(
+            title={
+                'text': 'Boxplot of best parameter sets (%s comparison over runs {%s})' %
+                (cmp, ",".join(str(x) for x in result_nums)),
+                'y': 0.95,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top'}
+        )
+
+        fig.show()
+
+    def create_param_scatter_matrix(self, result_nums: list[int], cmp='optimizer', paths_dict=None):
+        """
+        Create a scatter matrix over the best parameter sets found during the optimization process (here alpha, beta, the three weight and the detection threshold).
+        Also, the mode of comparison can be changed, so different optimizers, problems or dynamics can be compared.
+
+        Args:
+            result_nums (list[int]): List of the folder suffixes to be processed, e.g. [5,6] for opt_5 and opt_6.
+            cmp (str, optional): Comparison identifier to compare the results against, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'optimizer'.
+            paths_dict (dict, optional): Dict to provide the path of the needed data directly, instead of iterating over results. Used for recursion only. Defaults to None.
+        """
+        results = pd.DataFrame()
+
+        if paths_dict:
+            folder = paths_dict
+            res = load_opt_best_params(folder['opt_best_params.csv'])
+            info = get_info(folder['info.json'])
+            key = get_key_parameter(cmp, info)
+            res['cmp'] = key
+            return res
+
+        for n in result_nums:
+            # load folder dict and the relevant contents
+            folder = self.load_result_folder(n)
+
+            if 'sub' in folder:
+                for sub_paths in folder.keys():
+                    if type(folder[sub_paths]) is dict:
+                        res = self.create_param_boxplot(
+                            [n], cmp=cmp, paths_dict=folder[sub_paths])
+                        results = pd.concat(
+                            [results, res], ignore_index=True, sort=False)
+            else:
+                res = load_opt_best_params(folder['opt_best_params.csv'])
+                info = get_info(folder['info.json'])
+                key = get_key_parameter(cmp, info)
+                res['cmp'] = key
+                results = pd.concat(
+                    [results, res], ignore_index=True, sort=False)
+
+        y = ['alpha', 'beta', 'w_pers_best', 'w_pers_prev', 'w_parent_best']
+        if 'detection_threshold' in results.columns:
+            y.append('detection_threshold')
+
+        fig = px.scatter_matrix(results,
+                                dimensions=y,
+                                color="cmp" if cmp else None)
+        fig.update_traces(diagonal_visible=False, showupperhalf=False)
+        fig.update_layout(legend_title_text=cmp)
+        if cmp:
+            txt = ('Scatter matrix of best parameter sets (%s comparison over runs {%s})' %
+                   (cmp, ",".join(str(x) for x in result_nums)))
+        else:
+            txt = ('Parameter Scatter Matrix (over runs {%s})' %
+                   (",".join(str(x) for x in result_nums)))
+        fig.update_layout(
+            title={
+                'text': txt,
+                'y': 0.9,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top'}
+        )
         fig.show()
 
     def create_convergence_plot(self, result_nums: list[int], paths_dict=None):
@@ -206,6 +348,7 @@ class Analyzer:
             plot_objective(res, dimensions=dimensions, n_points=n_points)
             plt.suptitle('Partial Dependence (opt_%d, %s, %s [C=%d], run %d of %d)' %
                          (result_num, opt, problem, dynamic_intensity, i+1, len(results)))
+
         plt.show()
 
     def load_result_folder(self, result_num: int) -> Path:
@@ -259,6 +402,22 @@ def load_opt_best_params(path: str) -> pd.DataFrame:
     return df
 
 
+def load_avg_run(path: str) -> pd.DataFrame:
+    try:
+        return pd.read_pickle(path)
+    except:
+        raise FileExistsError(
+            'File from provided path could not be loaded: %s' % path)
+
+
+def load_run(path: str) -> pd.DataFrame:
+    try:
+        return pd.read_csv(path, sep=";")
+    except:
+        raise FileExistsError(
+            'File from provided path could not be loaded: %s' % path)
+
+
 def load_opt_result(folder: dict, pickled=True) -> list[OptimizeResult]:
     """
     Load the results of the optimizing runs, generally being of the OptimizeResult class
@@ -297,7 +456,7 @@ def load_opt_result(folder: dict, pickled=True) -> list[OptimizeResult]:
     return res
 
 
-def get_comparison_parameter(cmp: str, info: dict) -> str:
+def get_key_parameter(cmp: str, info: dict) -> str:
     """
     Returns the corresponding info for the provided comparison identifier to add to the data.
 

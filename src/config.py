@@ -36,6 +36,12 @@ MODE_OPTIMIZE = "opt"
 output_folder_prefix = {MODE_RUN: "run_",
                         MODE_EXPERIMENT: "exp_", MODE_OPTIMIZE: "opt_"}
 
+result_fn = {
+    MODE_RUN: "run",
+    MODE_OPTIMIZE: ["opt_log_", "opt_run_", "opt_best_params"],
+    MODE_EXPERIMENT: ["exp_run_", "avg_run"]
+}
+
 subfolder_prefix = 'dynamic_'
 
 logger_run_params = {

@@ -109,6 +109,8 @@ def main():
                 dynamic_num = sum(
                     [len(p) for p in params['exp']['problem']]) - len(params['opt']['problem'])
                 logger.init_dynamic(params['exp']['problem'], dynamic_num)
+            else:
+                dynamic_num = 1
 
             n_runs = args.runs if args.runs != 0 else get_run_number()
 
