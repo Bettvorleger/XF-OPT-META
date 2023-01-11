@@ -1,10 +1,12 @@
 from scipy.optimize import OptimizeResult
+from scipy.stats import wilcoxon
 from problem import Problem
 from tsp import TSP
 from config import output_folder_prefix, params
 import json
 from pathlib import Path
 import dill as pickle
+from sklearn import metrics
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from skopt.space import Space, Integer, Real
@@ -68,9 +70,21 @@ class Analyzer:
             NotImplementedError: _description_
         """
         results = {}
+
         for n in result_nums:
-            # load folder dict and the relevant contents
-            folder = self.load_result_folder(n)
+
+            if paths_dict:
+                folder = paths_dict
+            else:
+                # load folder dict and the relevant contents
+                folder = self.load_result_folder(n)
+
+            if 'sub' in folder:
+                for sub_paths in folder.keys():
+                    if type(folder[sub_paths]) is dict:
+                        key, res = self.create_run_plot(
+                            [n], paths_dict=folder[sub_paths])
+                        results.setdefault(key, []).append(res)
 
             if self.mode == self.MODE_RUN:
                 res = load_run(folder['run.csv'])
@@ -88,7 +102,12 @@ class Analyzer:
                 res['best_solution'] = res['best_solution'].subtract(
                     opt_solution).divide(opt_solution)
             # append or create list for current aggregation key
-            results.setdefault(get_key_parameter(aggr, info), []).append(res)
+
+            if paths_dict:
+                return get_key_parameter(aggr, info), res
+            else:
+                results.setdefault(get_key_parameter(
+                    aggr, info), []).append(res)
 
         fig = make_subplots(shared_xaxes=True, vertical_spacing=0.05,
                             rows=len(results), cols=1,
@@ -351,6 +370,162 @@ class Analyzer:
 
         plt.show()
 
+    def get_feature_importance(self, result_num: int, paths_dict=None) -> list[dict]:
+        """
+        Get the feature importance of a model built during the optimization process.
+        Currently only forest and gradient decent optimizers are supported.
+
+        Args:
+            result_num (int, optional): Result folder suffix to process.
+            paths_dict (_type_, optional): Dict to provide the path of the needed data directly, instead of iterating over results. Used for recursion only. Defaults to None.
+
+        Returns:
+            list[dict]: A list entry for each run within the result, containing a dict of all the parameters and their feature importance
+        """
+        param_importance = []
+
+        if paths_dict:
+            folder = paths_dict
+        else:
+            folder = self.load_result_folder(result_num)
+
+        if 'sub' in folder:
+            for sub_paths in folder.keys():
+                if type(folder[sub_paths]) is dict:
+                    self.get_feature_importance(
+                        result_num, folder[sub_paths])
+            return
+
+        info = get_info(folder['info.json'])
+        res = load_opt_result(folder, True)
+
+        dim = [d[0] for d in params[self.mode][self.obj_algorithm]]
+
+        for ir, r in enumerate(res):
+            # load last model from opt run
+            param_importance.append({})
+            model = r.models[-1]
+            if info['optimizer'] == 'gradient':
+                reg = model.regressors_
+                for id, d in enumerate(dim):
+                    param_importance[ir][d] = np.mean(
+                        [reg[x].feature_importances_[id]
+                            for x in range(len(reg))]
+                    )
+            elif info['optimizer'] == 'forest':
+                fi = model.feature_importances_
+                for id, d in enumerate(dim):
+                    param_importance[ir][d] = fi[id]
+            else:
+                raise NotImplementedError(
+                    'The optimizer method %s does not support this function' % (info['optimizer']))
+
+        return param_importance
+
+    def get_convergence_stats(self, result_nums: list[int], start_iteration=11, avg_res=False) -> dict:
+        """
+        Calculating multiple statistic relevant to the convergence behavior of an optimization algorithm.
+        Statistics are grouped by optimization algorithm and contain:
+            - min: the absolute minimal solution quality found during optimization
+            - auc: the area under the curve of a results convergence graph, averaged over all runs 
+            - wilcoxon: the summed ranks and p-value of the two-sided Wilcoxon signed-rank test compared to every other optimization algorithm
+                        and, if p-value is lower than significance level of 0.05, both one-sided tests (greater, less) are also added
+
+        Args:
+            result_nums (list[int]): Result folder suffix to process.
+            start_iteration (int, optional): If the iterations are needed for calculations, this is the value from which it starts.
+                                             Defaults to 11, because the first ten iterations are randomly sampled and do not depend on algorithm performance.
+            avg_res (bool, optional): If all statistics shall be averaged for respective algorithm, instead of being lists. Defaults to False.
+
+        Returns:
+            dict: Dict containing statistics as mentioned above, grouped by optimization algo.
+        """
+        stats = {}
+
+        for n in result_nums:
+            # load IO wrapper for accesing files from run
+            folder = self.load_result_folder(n)
+            opt = get_optimizer_type(folder['info.json'])
+            if opt not in stats:
+                stats[opt] = {'auc': [], 'min': [],
+                              'mean_mins': [], 'wilcoxon': {}}
+            opt_solution = get_optimal_solution(folder['info.json'])
+            res = load_opt_result(folder, pickled=False)
+            n_calls = len(res[0].x_iters)
+            iterations = range(start_iteration, n_calls + 1)
+            mins = [[np.min(r.func_vals[:i]) for i in iterations]
+                    for r in res]
+            mean_x = np.mean(mins, axis=0)
+            abs_min = np.min([(r.fun-opt_solution)/opt_solution for r in res])
+            stats[opt]['auc'].append(metrics.auc(iterations, mean_x))
+            stats[opt]['min'].append(abs_min)
+            stats[opt]['mean_mins'].append(mean_x)
+
+        for k, v in stats.items():
+            if avg_res:
+                v['auc'] = np.mean(v['auc'])
+                v['min'] = np.mean(v['min'])
+
+            for k2 in stats.keys():
+                if k is not k2:
+                    x = np.mean(v['mean_mins'], axis=0)
+                    y = np.mean(stats[k2]['mean_mins'], axis=0)
+                    statistic, pvalue = wilcoxon(
+                        x[start_iteration:], y[start_iteration:])
+                    v['wilcoxon'][k2] = {
+                        'statistic': statistic, 'pvalue': pvalue}
+                    # test for p-value lower than significance level of 0.05, suggesting that distributions are significantly different
+                    if pvalue < 0.05:
+                        statistic2, pvalue2 = wilcoxon(
+                            x[start_iteration:], y[start_iteration:], alternative='less')
+                        statistic3, pvalue3 = wilcoxon(
+                            x[start_iteration:], y[start_iteration:], alternative='greater')
+                        v['wilcoxon'][k2]['pvalue_less'] = pvalue2
+                        v['wilcoxon'][k2]['pvalue_greater'] = pvalue3
+
+        for k, v in stats.items():
+            v.pop('mean_mins')
+
+        return stats
+
+    def create_func_opt_boxplot(self, result_nums: list[int], start_iteration=11) -> None:
+        """
+        Creating a boxplot of the relative difference to optimal solution quality of all minimal func values and the AUC of the solution quality convergence graph.
+        Values are being gathered across all provided results and x axes is split by optimization algorithm.
+
+        Args:
+            result_nums (list[int]): Result folder suffix to process.
+            start_iteration (int, optional): If the iterations are needed for calculations, this is the value from which it starts.
+                                             Defaults to 11, because the first ten iterations are randomly sampled and do not depend on algorithm performance.
+        """
+        func_results = {}
+        auc_results = {}
+        for n in result_nums:
+            # load IO wrapper for accesing files from run
+            folder = self.load_result_folder(n)
+            opt = get_optimizer_type(folder['info.json'])
+            opt_solution = get_optimal_solution(folder['info.json'])
+            res = load_opt_result(folder, pickled=False)
+
+            n_calls = len(res[0].x_iters)
+            iterations = range(start_iteration, n_calls + 1)
+            mins = [[np.min(r.func_vals[:i]) for i in iterations]
+                    for r in res]
+            auc_results.setdefault(opt, []).extend(
+                [metrics.auc(iterations, vals) for vals in mins])
+            func_results.setdefault(opt, []).extend(
+                [(r.fun-opt_solution)/opt_solution for r in res])
+
+        fig = make_subplots(shared_xaxes=True,
+                            rows=2, cols=1, vertical_spacing=0.05,
+                            subplot_titles=("Relative difference to optimal solution quality of all minimal func values ", "AUC of solution quality convergence graph"))
+        fig1 = px.box(pd.DataFrame(func_results))
+        fig2 = px.box(pd.DataFrame(auc_results))
+
+        fig.add_trace(go.Box(fig1['data'][0]), row=1, col=1)
+        fig.add_trace(go.Box(fig2['data'][0]), row=2, col=1)
+        fig.show()
+
     def load_result_folder(self, result_num: int) -> Path:
         """
         Load the content of an output folder
@@ -418,7 +593,7 @@ def load_run(path: str) -> pd.DataFrame:
             'File from provided path could not be loaded: %s' % path)
 
 
-def load_opt_result(folder: dict, pickled=True) -> list[OptimizeResult]:
+def load_opt_result(folder: dict, pickled=True, normalize=True) -> list[OptimizeResult]:
     """
     Load the results of the optimizing runs, generally being of the OptimizeResult class
 
@@ -426,6 +601,7 @@ def load_opt_result(folder: dict, pickled=True) -> list[OptimizeResult]:
         folder (dict):              Dict of the filenames and their locations
         pickled (bool, optional):   If the results are provided in a pickled or unpickled form.
                                     Pickled preferred, json eventually deprecated. Defaults to True.
+        normalize (bool, optional): Set if the function results should be normalized by the optimum of the problem instance
 
     Returns:
         list[OptimizeResult]: List of OptimizeResult classes, being results of optimization runs
@@ -446,7 +622,7 @@ def load_opt_result(folder: dict, pickled=True) -> list[OptimizeResult]:
                 log = json.load(
                     f, object_hook=lambda d: OptimizeResult(**d))
                 f.close()
-                if opt_solution:
+                if opt_solution and normalize:
                     log.func_vals = np.array(
                         [(x-opt_solution)/opt_solution for x in log.func_vals])
                 else:
