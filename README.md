@@ -155,7 +155,9 @@ These are all the available parameters for the HSPPBO algorithm, their respectiv
 
 The H and &theta; parameters are closely related to the hierarchical part of the HSPPBO algorithm, so there is almost no reference to existing implementations or papers, except for [[11]](#11) with its hierarchical version of a particle swarm optimization algorithm. Regarding H, [[6]](#6) found the 'partial' reaction to oftentimes perform better than 'full', the changing heuristic influence through &beta; during the optimization runs, hints to an interesting behavior of this parameter, so both reaction types will be used.
 The &theta; seems to benefit from values greater than 0.1, and gets mixed results from values between 0.25 and 0.5, depending highly on the problem instance and its dynamic frequency C, according to [[6]](#6). Since values higher than 0.5 would invalidate the need for a change handling procedure altogether, because the changes would not get detected, a range of [0.1, 0.5] will be tested.
-The L parameter is also related to this specific implementation of the dynamic handling of the algorithm. Since its only purpose is to disable detection right after each interval of change by the dynamic TSP instance, it only needs to be high enough to account for the rearrangement of the SCE tree. And because it imposes the risk of unfair prior-knowledge of the change interval it should be as small as possible, since a value equal to the change period would, of course, result in almost perfect detection. Accounting for the theoretical 'worst-case' behavior of full reorganization on all of the three levels of the ternary tree with 13 SCE, taking 3 iterations, the value of L = 5 used in [[6]](#6) is very reasonable. # TODO, explain iterations
+The L parameter is also related to this specific implementation of the dynamic handling of the algorithm. Since its only purpose is to disable detection right after each interval of change by the dynamic TSP instance, it only needs to be high enough to account for the rearrangement of the SCE tree. And because it imposes the risk of unfair prior-knowledge of the change interval it should be as small as possible, since a value equal to the change period would, of course, result in almost perfect detection. Accounting for the theoretical 'worst-case' behavior of full reorganization on all of the three levels of the ternary tree with 13 SCE, taking 3 iterations, the value of L = 5 used in [[6]](#6) is very reasonable.
+
+[comment]: # (TODO: explain iterations)
 
 The values for &alpha; and &beta; are used in almost every ACO variant and many metaheuristics in general. Since the work by Dorigo [[7]](#7), most papers regarding ACO variants use &alpha; and &beta; values between 0 and 5, while oftentimes using the recommendation of Dorigo (&alpha; = 1 and &beta; = 5). However, this applies to the ACO version Dorigo used on symmetric TSP instances, while the HSPPBO combined with dynamic TSP instances differs greatly from that. Moreover, work like [[8]](#8), [[9]](#9), [[10]](#10) and [[12]](#12) imply that good parameter combinations can differ greatly from this recommendation depending on the problem type and algorithm, using values of 10 or higher. Because &alpha; and &beta; are exponents and the term, in which they are used, gets normalized to a probability anyway, the values should be seen relative to each other, rather than absolute. Therefore, they should be able to span at least 10% between each other to cover every sensible combination of the two. Values ranges greater than that would pose the risk to relatively reduce the other parameter to a value where it loses its significance and practically deactivate it, while this should better be realized by choosing a value of 0. It could also be argued, that, based on this logic, a real value chosen from [0,1] would also result in similar expressiveness. But natural numbers are most often used for these parameters and make for much easier comparison. This concludes in a range of [0,10], with &alpha;,&beta; ∈ ℕ<sup>0</sup>.
 
@@ -205,7 +207,11 @@ The original 5 sets of parameters will be executed on their respective problem i
 
 The three parts will all be subject to a different goal of conclusion.
 
-Part one focuses on the ideal hyperoptimization method to use. Therefore, the convergence behavior, the resulting solution quality and the stability of the selected parameters will be subject of this part.
+Part one focuses on the ideal hyperoptimization method to use. Therefore, the convergence behavior, the resulting solution quality and the robustness in finding a good solution will be subject of this part.
+For this, a convergence plot is created for all five problem instances, with all four optimization methods represented by differently colored lines. The main and boldly colored lines are the means of all runs for each iteration, while the transparent lines are the actual convergence plot lines.
+Additionally, a sixth convergence plot over the means of all problem instances for each algorithm is created. Also, the area under the curve (AUC) and the Wilcoxon signed-rank test, the two-sided variant and, if the p-value is lower than the significance level of 0.05, both one-sided tests, for each algorithm and each problem are being calculated.
+All of the evaluations mentioned above start after iteration 10, because the first ten iterations are randomly sampled and do not reflect the model/algorithm behavior.
+Furthermore, the minimal solution quality obtained for each algorithm and each problem instance is being exported.
 
 Part two focuses on the difference (and similarities) between the optimal parameters for each problem category. Boxplots and statistical tests will be done on all subcategories of parameters, to analyze how they behave on their respective problem instances and dynamics. Furthermore, it goes after the questions how and if a general purpose parameter set is even sensible.
 
@@ -213,6 +219,57 @@ Part three focuses on validation of parameters. While its methods used are that 
 
 Additionally, with all the data gained throughout testing, a simple AI model (ideally with potential for feature importance analysis) will be trained to output an optimal parameter set given the properties of the problem instance, like size, coeff_var, qdc and eigenvalue.
 
+## 4. Results
+
+## 4.1 Part 1 - Finding the best optimization algorithm
+
+All experiments and analysis have been executed according to prior explanation in 3.3 and 3.4.
+
+The convergence plot for all four optimization algorithms aggregated over all problem instances is being shown here:
+![image](results/part1/convergence_all.png)
+
+This shows a pretty strong lead for the gradient boosted regression trees, having not only the best mean minimum solution quality, but also the best any-time solution from iteration 12 on, with only the extra trees (ET) algorithm coming close.
+The random algorithm has a trend of "getting lucky" after a few iterations, closing the gap to the Bayesian algorithm.
+The single convergence plots for each problem instance suggest similar assumptions:
+[eil51](results/part1/convergence_eil51.png),
+[berlin52](results/part1/convergence_berlin52.png),
+[d198](results/part1/convergence_d198.png),
+[pr136](results/part1/convergence_pr136.png),
+[pr226](results/part1/convergence_pr226.png).
+
+The mean AUC and the mean of the minimal relative solution quality per problem for each algorithm is being shown here:
+|     | random      | bayesian    | forest      | gradient    |
+|-----|-------------|-------------|-------------|-------------|
+| auc | 1.483779638 | 1.298337488 | 1.268335009 | 1.190100084 |
+| min | 0.058100514 | 0.059981385 | 0.051153124 | 0.045089053 |
+
+The AUC should ideally be as small as possible, suggesting a fast convergence with good solutions. This is, again, the case for the gradient algorithm, having not only the smallest AUC of 1.19, but also the smallest relative difference to the optimal solution, being only around 4,5% away from the optimal solution on average.
+
+The spread of the AUC and minimum across all values suggests a slightly different picture. This is shown by the follwing boxplot:
+![image](results/part1/convergence_stats_boxplot.png)
+Although the gradient algorithm has the lowest AUC and minimum, the spread around the median is larger than with the bayesian algorithm. This suggests, that the bayesian algorithm could result in more consistent performance and, possibly, more consistent parameter sets. Nevertheless, the median and lower quartile is consistently smaller with the gradient algorithm, with only the upper quartile of the AUC being in favor of the bayesian algorithm.
+
+Lastly, the Wilcoxon signed-rank tests over the iterations and their relative solution qualities are being analyzed.
+
+|  | gradient |  |  | bayesian |  | forest |
+|---|---|---|---|---|---|---|
+|  | random | bayesian | forest | random | forest | random |
+|  |  |  |  |  |  |  |
+| statistic | 0 | 0 | 0 | 1 | 0 | 22 |
+| pvalue | 0.00390625 | 0.00390625 | 0.00390625 | 0.0078125 | 0.00390625 | 1 |
+| statistic_less | 0 | 0 | 0 | 44 | 45 |  |
+| pvalue_less | 0.001953125 | 0.001953125 | 0.001953125 | 0.998046875 | 1 |  |
+| statistic_greater | 0 | 0 | 0 | 44 | 45 |  |
+| pvalue_greater | 1 | 1 | 1 | 0.00390625 | 0.001953125 |  |
+
+Shown here are the results for the eil51 instance, with the algorithm in first header row being compared to the algorithm in the second row. So, for example, the first column shows the difference in convergence behavior between gradient algorithm and random search. 'Statistic' is the sum of the negative and positive ranks, 'statistic_less' only the sum of the negative ranks, analogue for 'statistic_greater', and all of the their corresponding p-values.
+
+Setting a significance level of 0.05, we can conclude that the convergence behavior of the gradient algorithm not only differs from all other algorithms (rejecting the null hypothesis), but also has significantly smaller values (confirming the alternative).
+The distribution of values for the bayesian algorithm is significantly greater than for random search and the EF algorithm. And for the difference between random search and the EF algorithm, we can't even reject the null hypothesis, suggesting, but not proving, similar distributions.
+
+The other instances mostly present the same conclusion, with the gradient algorithm confirming the alternative hypothesis of being smaller than the compared algorithm a total of ten times. EF and bayesian only achieve that six times, and random search only three times.
+
+In summary, the gradient boosted regression trees algorithm has the fastest convergence with the best solution qualities while delivering the second most robust results. Therefore, it will be used for conducting part two of the test procedure.
 
 ## References
 

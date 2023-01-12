@@ -26,11 +26,12 @@ class Analyzer:
     MODE_EXPERIMENT = "exp"
     MODE_OPTIMIZE = "opt"
 
-    def __init__(self, mode=MODE_RUN, obj_algorithm='hsppbo', results_path="output/") -> None:
+    def __init__(self, mode=MODE_RUN, obj_algorithm='hsppbo', results_path="output/", output_path=None) -> None:
         self.mode = mode
         self.path_prefix = output_folder_prefix[mode]
         self.results_path = results_path
         self.obj_algorithm = obj_algorithm
+        self.output_path = output_path
 
     def create_results(self) -> None:
         results = {}
@@ -289,12 +290,15 @@ class Analyzer:
         """
 
         results = []
+        problems = set()
         opt_solution = None
 
         if paths_dict:
             folder = paths_dict
             opt_solution = get_optimal_solution(folder['info.json'])
-            opt = get_optimizer_type(folder['info.json'])
+            info = get_info(folder['info.json'])
+            opt = info['optimizer']
+            problems.add(info['problem']['name'])
             return (opt, load_opt_result(folder, pickled=False))
 
         for n in result_nums:
@@ -309,16 +313,39 @@ class Analyzer:
                             [n], paths_dict=folder[sub_paths]))
             else:
                 opt_solution = get_optimal_solution(folder['info.json'])
-                opt = get_optimizer_type(folder['info.json'])
+                info = get_info(folder['info.json'])
+                opt = info['optimizer']
+                problems.add(info['problem']['name'])
                 results.append(
                     (opt, load_opt_result(folder, pickled=False)))
-
+        
+        if len(problems) == 1:
+                problem = problems.pop()
+        else:
+            problem = None
+            new_r = {}
+            for r in results:
+                new_r.setdefault(r[0], []).extend(r[1])
+            results = []
+            for k,v in new_r.items():
+                results.append((k,v))
+                
         if results:
             plot = plot_convergence(*results)
             if opt_solution:
-                plot.set_ylim([-0.02, 0.25])
-            plot.legend(loc="best", prop={'size': 8}, numpoints=1)
-            plt.show()
+                plot.set_ylim([0.00, 0.25])
+                plot.set_xlim([8,31])
+                plot.set_ylabel(r"relative difference to optimal solution quality after $n$ calls")
+            if problem:
+                plot.set_title(f'Convergence plot ({problem})')
+            plot.legend(loc="upper right", prop={'size': 8}, numpoints=1)
+            
+            if self.output_path and problem:
+                plt.savefig("/".join([self.output_path,f'convergence_{problem}.png']), dpi=300)
+            elif self.output_path:
+                plt.savefig("/".join([self.output_path,'convergence_all.png']), dpi=300)
+            else:
+                plt.show()
 
     def create_partial_dep_plot(self, result_num: int, paths_dict=None, n_points=40):
         """
@@ -441,11 +468,15 @@ class Analyzer:
             dict: Dict containing statistics as mentioned above, grouped by optimization algo.
         """
         stats = {}
+        problems = set()
 
         for n in result_nums:
             # load IO wrapper for accesing files from run
             folder = self.load_result_folder(n)
-            opt = get_optimizer_type(folder['info.json'])
+            info = get_info(folder['info.json'])
+            opt = info['optimizer']
+            problems.add(info['problem']['name'])
+            
             if opt not in stats:
                 stats[opt] = {'auc': [], 'min': [],
                               'mean_mins': [], 'wilcoxon': {}}
@@ -462,10 +493,6 @@ class Analyzer:
             stats[opt]['mean_mins'].append(mean_x)
 
         for k, v in stats.items():
-            if avg_res:
-                v['auc'] = np.mean(v['auc'])
-                v['min'] = np.mean(v['min'])
-
             for k2 in stats.keys():
                 if k is not k2:
                     x = np.mean(v['mean_mins'], axis=0)
@@ -480,12 +507,18 @@ class Analyzer:
                             x[start_iteration:], y[start_iteration:], alternative='less')
                         statistic3, pvalue3 = wilcoxon(
                             x[start_iteration:], y[start_iteration:], alternative='greater')
+                        v['wilcoxon'][k2]['statistic_less'] = statistic2
                         v['wilcoxon'][k2]['pvalue_less'] = pvalue2
+                        v['wilcoxon'][k2]['statistic_greater'] = statistic3
                         v['wilcoxon'][k2]['pvalue_greater'] = pvalue3
 
         for k, v in stats.items():
             v.pop('mean_mins')
-
+            if avg_res or len(problems) == 1:
+                v['auc'] = np.mean(v['auc'])
+                v['min'] = np.mean(v['min'])
+        if len(problems) == 1:
+            stats['problem'] = problems.pop()
         return stats
 
     def create_func_opt_boxplot(self, result_nums: list[int], start_iteration=11) -> None:
@@ -518,13 +551,17 @@ class Analyzer:
 
         fig = make_subplots(shared_xaxes=True,
                             rows=2, cols=1, vertical_spacing=0.05,
-                            subplot_titles=("Relative difference to optimal solution quality of all minimal func values ", "AUC of solution quality convergence graph"))
+                            subplot_titles=("Relative difference to optimal solution quality<br>of all minimal function values ", "AUC of solution quality convergence graph"))
         fig1 = px.box(pd.DataFrame(func_results))
         fig2 = px.box(pd.DataFrame(auc_results))
-
         fig.add_trace(go.Box(fig1['data'][0]), row=1, col=1)
         fig.add_trace(go.Box(fig2['data'][0]), row=2, col=1)
-        fig.show()
+        fig.update_layout(margin = {'l':10,'r':10,'t':45,'b':10})
+        fig.update_annotations(font_size=14)
+        if self.output_path:
+            fig.write_image("/".join([self.output_path,'convergence_stats_boxplot.png']), format="png", width=400, height=750, scale=2)
+        else:
+            fig.show()
 
     def load_result_folder(self, result_num: int) -> Path:
         """
