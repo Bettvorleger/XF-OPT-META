@@ -246,7 +246,9 @@ The mean AUC and the mean of the minimal relative solution quality per problem f
 The AUC should ideally be as small as possible, suggesting a fast convergence with good solutions. This is, again, the case for the gradient algorithm, having not only the smallest AUC of 1.19, but also the smallest relative difference to the optimal solution, being only around 4,5% away from the optimal solution on average.
 
 The spread of the AUC and minimum across all values suggests a slightly different picture. This is shown by the follwing boxplot:
+
 <img src="results/part1/convergence_stats_boxplot.png" width="300"/>
+
 Although the gradient algorithm has the lowest AUC and minimum, the spread around the median is larger than with the bayesian algorithm. This suggests, that the bayesian algorithm could result in more consistent performance and, possibly, more consistent parameter sets. Nevertheless, the median and lower quartile is consistently smaller with the gradient algorithm, with only the upper quartile of the AUC being in favor of the bayesian algorithm.
 
 Lastly, the Wilcoxon signed-rank tests over the iterations and their relative solution qualities are being analyzed.
