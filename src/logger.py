@@ -155,6 +155,10 @@ class Logger:
         self.create_folder_info_log()
         self.sub_num += 1
 
+        if self.sub_num < len(self.dynamic_params[0]):
+            for dp in self.dynamic_params:
+                self.info["problem"]["dynamic_props"][dp[0]] = dp[self.sub_num]
+
     def create_file_wrapper(self, filename: str, mode='a') -> None:
         """
         Initializes a file wrapper for logging

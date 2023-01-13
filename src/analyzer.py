@@ -505,12 +505,20 @@ class Analyzer:
                     if pvalue < 0.05:
                         statistic2, pvalue2 = wilcoxon(
                             x[start_iteration:], y[start_iteration:], alternative='less')
-                        statistic3, pvalue3 = wilcoxon(
-                            x[start_iteration:], y[start_iteration:], alternative='greater')
                         v['wilcoxon'][k2]['statistic_less'] = statistic2
                         v['wilcoxon'][k2]['pvalue_less'] = pvalue2
-                        v['wilcoxon'][k2]['statistic_greater'] = statistic3
-                        v['wilcoxon'][k2]['pvalue_greater'] = pvalue3
+
+                    '''
+                    instead of Wilcoxon:
+                    Kruskal-Wallis test + Post-Hoc Conover-Iman test
+                    scipy.stats.kruskal
+                    scikit_posthocs.posthoc_conover
+
+                    Note: the often as similar regarded Friedman test is not used, since assumes the values to be paired or dependent,
+                    which this data is not, since each measurement is taken from a differently initialized algorithm. 
+                    '''
+
+
 
         for k, v in stats.items():
             v.pop('mean_mins')

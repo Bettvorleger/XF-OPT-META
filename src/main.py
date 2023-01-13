@@ -62,11 +62,11 @@ def check_percent_range(number: float) -> float:
 
 # TODO code:
 #   - all modes: add relative difference to optimal solution to run and exp output
-#   - analyzer: 
+#   - analyzer:
 #       - comparing opt methods (convergence plot), wilcoxon signed rank test (https://en.wikipedia.org/wiki/Wilcoxon_signed-rank_test)
 #       - comparing opt params (boxplots, partial dependence plot, variance_inflation_factor, importance via PCA https://betterdatascience.com/feature-importance-python/)
 #       - comparing exp runs (avg run analysis)
- 
+
 # TODO code(optional):
 #   - implement tests
 #   - web UI (flask) and better packaging
@@ -149,7 +149,10 @@ def main():
             opt = Optimizer(opt_algo, hsppbo.execute_wrapper,
                             params['opt']['hsppbo'])
             for d in range(1, dynamic_num+1):
+                problem.set_dynamic(
+                    dynamic_intensity_pct=params['opt']['problem'][0][d])
                 logger.init_mode(params['opt']['hsppbo'], opt_algo)
+
                 for n in range(1, n_runs+1):
                     print("---STARTING OPTIMIZATION RUN " +
                           str(n) + "/" + str(n_runs) + " AND DYNAMIC CONF " + str(d) + "/" + str(dynamic_num) + "---")
