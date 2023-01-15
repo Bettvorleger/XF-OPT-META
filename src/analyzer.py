@@ -1,5 +1,6 @@
 from scipy.optimize import OptimizeResult
-from scipy.stats import wilcoxon
+from scipy.stats import wilcoxon, kruskal, mannwhitneyu
+import scikit_posthocs as sp
 from problem import Problem
 from tsp import TSP
 from config import output_folder_prefix, params
@@ -318,32 +319,35 @@ class Analyzer:
                 problems.add(info['problem']['name'])
                 results.append(
                     (opt, load_opt_result(folder, pickled=False)))
-        
+
         if len(problems) == 1:
-                problem = problems.pop()
+            problem = problems.pop()
         else:
             problem = None
             new_r = {}
             for r in results:
                 new_r.setdefault(r[0], []).extend(r[1])
             results = []
-            for k,v in new_r.items():
-                results.append((k,v))
-                
+            for k, v in new_r.items():
+                results.append((k, v))
+
         if results:
             plot = plot_convergence(*results)
             if opt_solution:
                 plot.set_ylim([0.00, 0.25])
-                plot.set_xlim([8,31])
-                plot.set_ylabel(r"relative difference to optimal solution quality after $n$ calls")
+                plot.set_xlim([8, 31])
+                plot.set_ylabel(
+                    r"relative difference to optimal solution quality after $n$ calls")
             if problem:
                 plot.set_title(f'Convergence plot ({problem})')
             plot.legend(loc="upper right", prop={'size': 8}, numpoints=1)
-            
+
             if self.output_path and problem:
-                plt.savefig("/".join([self.output_path,f'convergence_{problem}.png']), dpi=300)
+                plt.savefig(
+                    "/".join([self.output_path, f'convergence_{problem}.png']), dpi=300)
             elif self.output_path:
-                plt.savefig("/".join([self.output_path,'convergence_all.png']), dpi=300)
+                plt.savefig(
+                    "/".join([self.output_path, 'convergence_all.png']), dpi=300)
             else:
                 plt.show()
 
@@ -455,8 +459,11 @@ class Analyzer:
         Statistics are grouped by optimization algorithm and contain:
             - min: the absolute minimal solution quality found during optimization
             - auc: the area under the curve of a results convergence graph, averaged over all runs 
-            - wilcoxon: the summed ranks and p-value of the two-sided Wilcoxon signed-rank test compared to every other optimization algorithm
-                        and, if p-value is lower than significance level of 0.05, both one-sided tests (greater, less) are also added
+            - kwh + conover: Kruskal-Wallis test + Post-Hoc Conover-Iman test
+            - mannwhitneyu: (only for h0-rejects of Conover's test) the bonferroni corrected p-value of the one-sided (lesser) Mann–Whitney U test
+
+        Note: the often as similar regarded Friedman test is not used, since assumes the values to be paired or dependent,
+        which this data is not, since each measurement is taken from a differently initialized algorithm. 
 
         Args:
             result_nums (list[int]): Result folder suffix to process.
@@ -468,6 +475,7 @@ class Analyzer:
             dict: Dict containing statistics as mentioned above, grouped by optimization algo.
         """
         stats = {}
+        tests = {}
         problems = set()
 
         for n in result_nums:
@@ -476,10 +484,10 @@ class Analyzer:
             info = get_info(folder['info.json'])
             opt = info['optimizer']
             problems.add(info['problem']['name'])
-            
+
             if opt not in stats:
                 stats[opt] = {'auc': [], 'min': [],
-                              'mean_mins': [], 'wilcoxon': {}}
+                              'mean_mins': []}
             opt_solution = get_optimal_solution(folder['info.json'])
             res = load_opt_result(folder, pickled=False)
             n_calls = len(res[0].x_iters)
@@ -492,42 +500,42 @@ class Analyzer:
             stats[opt]['min'].append(abs_min)
             stats[opt]['mean_mins'].append(mean_x)
 
-        for k, v in stats.items():
-            for k2 in stats.keys():
-                if k is not k2:
-                    x = np.mean(v['mean_mins'], axis=0)
-                    y = np.mean(stats[k2]['mean_mins'], axis=0)
-                    statistic, pvalue = wilcoxon(
-                        x[start_iteration:], y[start_iteration:])
-                    v['wilcoxon'][k2] = {
-                        'statistic': statistic, 'pvalue': pvalue}
-                    # test for p-value lower than significance level of 0.05, suggesting that distributions are significantly different
-                    if pvalue < 0.05:
-                        statistic2, pvalue2 = wilcoxon(
+        mean_min_key_list = [x for x in stats.keys()]
+        mean_min_val_list = [np.mean(x['mean_mins'], axis=0)
+                             for x in stats.values()]
+        kwh = kruskal(*mean_min_val_list)
+        tests['kwh'] = {'statistic': kwh[0], 'pvalue': kwh[1]}
+
+        if kwh[1] <= 0.05:  # al h0 of Kruskal-Wallis test are post-hox checked via Conover-Iman test
+            conover = sp.posthoc_conover(mean_min_val_list, p_adjust='bonf')
+            conover.columns, conover.index = mean_min_key_list, mean_min_key_list
+
+            con_h0 = (conover < 0.05)
+            # number of previous pairwise tests (conover) plus the to be executed mwu tests
+            bonf_cor = len(mean_min_val_list)**2 + con_h0.to_numpy().sum()
+            tests['conover'] = conover.to_dict()
+
+            tests['mwu'] = {}
+            for k, v in con_h0.to_dict().items():
+                tests['mwu'][k] = {}
+                for k2, v2 in v.items():
+                    if k is not k2 and v2:
+                        x = np.mean(stats[k]['mean_mins'], axis=0)
+                        y = np.mean(stats[k2]['mean_mins'], axis=0)
+                        mwu = mannwhitneyu(
                             x[start_iteration:], y[start_iteration:], alternative='less')
-                        v['wilcoxon'][k2]['statistic_less'] = statistic2
-                        v['wilcoxon'][k2]['pvalue_less'] = pvalue2
-
-                    '''
-                    instead of Wilcoxon:
-                    Kruskal-Wallis test + Post-Hoc Conover-Iman test
-                    scipy.stats.kruskal
-                    scikit_posthocs.posthoc_conover
-
-                    Note: the often as similar regarded Friedman test is not used, since assumes the values to be paired or dependent,
-                    which this data is not, since each measurement is taken from a differently initialized algorithm. 
-                    '''
-
-
+                        tests['mwu'][k][k2] = {
+                            'statisitc': mwu[0], 'pvalue': mwu[1]*bonf_cor if mwu[1] < (0.05/bonf_cor) else mwu[1]}
 
         for k, v in stats.items():
-            v.pop('mean_mins')
+            # v.pop('mean_mins')
             if avg_res or len(problems) == 1:
                 v['auc'] = np.mean(v['auc'])
                 v['min'] = np.mean(v['min'])
         if len(problems) == 1:
             stats['problem'] = problems.pop()
-        return stats
+
+        return stats, tests
 
     def create_func_opt_boxplot(self, result_nums: list[int], start_iteration=11) -> None:
         """
@@ -564,10 +572,11 @@ class Analyzer:
         fig2 = px.box(pd.DataFrame(auc_results))
         fig.add_trace(go.Box(fig1['data'][0]), row=1, col=1)
         fig.add_trace(go.Box(fig2['data'][0]), row=2, col=1)
-        fig.update_layout(margin = {'l':10,'r':10,'t':45,'b':10})
+        fig.update_layout(margin={'l': 10, 'r': 10, 't': 45, 'b': 10})
         fig.update_annotations(font_size=14)
         if self.output_path:
-            fig.write_image("/".join([self.output_path,'convergence_stats_boxplot.png']), format="png", width=400, height=750, scale=2)
+            fig.write_image("/".join([self.output_path, 'convergence_stats_boxplot.png']),
+                            format="png", width=400, height=750, scale=2)
         else:
             fig.show()
 
