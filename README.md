@@ -209,7 +209,18 @@ The three parts will all be subject to a different goal of conclusion.
 
 Part one focuses on the ideal hyperoptimization method to use. Therefore, the convergence behavior, the resulting solution quality and the robustness in finding a good solution will be subject of this part.
 For this, a convergence plot is created for all five problem instances, with all four optimization methods represented by differently colored lines. The main and boldly colored lines are the means of all runs for each iteration, while the transparent lines are the actual convergence plot lines.
-Additionally, a sixth convergence plot over the means of all problem instances for each algorithm is created. Also, the area under the curve (AUC) and the Wilcoxon signed-rank test, the two-sided variant and, if the p-value is lower than the significance level of 0.05, both one-sided tests, for each algorithm and each problem are being calculated.
+Additionally, a sixth convergence plot over the means of all problem instances for each algorithm is created. Also, the area under the curve (AUC) and some non-parametric statistical hypothesis tests for each algorithm and each problem are being calculated.
+
+Each run of the algorithm is subject to a new random initialization, which influences the chosen path, the dynamic of the problem instances and the sampling of the hyperparameters during optimization. Although the model built during the optimization procedure chooses each set of parameters based on the last iterations, the completely different behavior of a newly initialized HSSPBO and problem instance makes them not directly comparable. Therefore, each run can be seen as individual entity and not part of a series of optimization iterations, thus, making them unpaired or independent of each other. This is important to state before choosing the appropriate tests and applies to the comparison across all optimization parameters (methods, dynamics, problem instances).
+Since our comparison of optimization methods is non-parametric, which rules out ANOVA, and contains more than two groups to compare, we can narrow down the ideal tests efficiently and choose the Kruskal–Wallis H test, which can be seen as a Mann–Whitney U test for more than two groups.
+It already takes into account the number of groups and does not need a separate correction of the Type I or multiple comparisons error.
+We choose a standard significance level of 0.05 to reject the null hypothesis. 
+
+To further compare the runs we conduct a post-hoc test in case of a H0 rejection. Using the same assumptions as before, there are multiple applicable tests after a Kruskal–Wallis H test, the most popular being the Dunn's test. However, we choose the lesser known, but supposedly more significant Conover–Iman test [[15]](#15). This test conducts multiple pairwise comparisons out of all group members, each result giving a p-value in accordance to the null hypothesis of coming from the same distribution. Since multiple tests are performed on the same dataset, there is a need for correcting the Type I error. Using a simple Bonferroni correction, we gain more false positive H0-rejects (smaller p-values), but also less false negatives, which is fine in our case of having multiple other measures to use as well.
+
+As a last test, we conduct a Mann–Whitney U test on all H0-rejects of the Conover-Iman test to find out, if one group, being the convergence behavior of an optimization method, has significantly larger solutions than the other. This test is comparable to the Wilcoxon signed-rank test, which also uses the summation of ranks, but assumes the data to be matched or dependent, which is not the case here. It is also more usual to conduct a two-sided Wilcoxon test, which formulates a null hypothesis of having the identical distribution for both groups. The Mann–Whitney U test, however, was orignally proposed to test "whether one of Two Random Variables is Stochastically Larger than the Other" [[14]](#14), which is exactly what we want. Again, to address concerns about the multiple comparisons error, a Bonferroni correction is being applied, that also takes into account the number of tests done during the Conover-Iman test.
+
+
 All of the evaluations mentioned above start after iteration 10, because the first ten iterations are randomly sampled and do not reflect the model/algorithm behavior.
 Furthermore, the minimal solution quality obtained for each algorithm and each problem instance is being exported.
 
@@ -251,25 +262,50 @@ The spread of the AUC and minimum across all values suggests a slightly differen
 
 Although the gradient algorithm has the lowest AUC and minimum, the spread around the median is larger than with the bayesian algorithm. This suggests, that the bayesian algorithm could result in more consistent performance and, possibly, more consistent parameter sets. Nevertheless, the median and lower quartile is consistently smaller with the gradient algorithm, with only the upper quartile of the AUC being in favor of the bayesian algorithm.
 
-Lastly, the Wilcoxon signed-rank tests over the iterations and their relative solution qualities are being analyzed.
+Lastly, the statistical tests, starting with the Kruskal–Wallis H test over the means of all optimization runs (being convergence results) for each method, are being analyzed. All tests were conducted on the separate problem instances and also on the average of all instances.
 
-|  | gradient |  |  | bayesian |  | forest |
-|---|---|---|---|---|---|---|
-|  | random | bayesian | forest | random | forest | random |
-|  |  |  |  |  |  |  |
-| statistic | 0 | 0 | 0 | 1 | 0 | 22 |
-| pvalue | 0.00390625 | 0.00390625 | 0.00390625 | 0.0078125 | 0.00390625 | 1 |
-| statistic_less | 0 | 0 | 0 | 44 | 45 |  |
-| pvalue_less | 0.001953125 | 0.001953125 | 0.001953125 | 0.998046875 | 1 |  |
-| statistic_greater | 0 | 0 | 0 | 44 | 45 |  |
-| pvalue_greater | 1 | 1 | 1 | 0.00390625 | 0.001953125 |  |
+The Kruskal–Wallis H test results all reject the null hypthosesis with a significantly low p-value of around 1e<sup>-6</sup> or less.
+Therefore, Conover–Iman tests were computed for all group pairings, with the results for eil51 as an representative example:
 
-Shown here are the results for the eil51 instance, with the algorithm in first header row being compared to the algorithm in the second row. So, for example, the first column shows the difference in convergence behavior between gradient algorithm and random search. 'Statistic' is the sum of the negative and positive ranks, 'statistic_less' only the sum of the negative ranks, analogue for 'statistic_greater', and all of the their corresponding p-values.
 
-Setting a significance level of 0.05, we can conclude that the convergence behavior of the gradient algorithm not only differs from all other algorithms (rejecting the null hypothesis), but also has significantly smaller values (confirming the alternative).
-The distribution of values for the bayesian algorithm is significantly greater than for random search and the EF algorithm. And for the difference between random search and the EF algorithm, we can't even reject the null hypothesis, suggesting, but not proving, similar distributions.
+|              | **random**   | **bayesian**  | **forest**    | **gradient**  |
+|--------------|--------------|---------------|---------------|---------------|
+| **random**   | 1            | 0\.626022837  | 1             | 1\.3613E\-11  |
+| **bayesian** | 0\.626022837 | 1             | 0\.045498418  | 9\.87937E\-15 |
+| **forest**   | 1            | 0\.045498418  | 1             | 1\.71033E\-09 |
+| **gradient** | 1\.3613E\-11 | 9\.87937E\-15 | 1\.71033E\-09 | 1             |      
 
-The other instances mostly present the same conclusion, with the gradient algorithm confirming the alternative hypothesis of being smaller than the compared algorithm a total of ten times. EF and bayesian only achieve that six times, and random search only three times.
+This shows, that in case of the gradient method, we can reject H0 for all pairings, making it significantly differenct from the other methods. 
+
+The following test results for berlin52 suggest, that bayesian optimization sometimes also differs greatly from the other methods:
+
+|               | **random**   | **bayesian**  | **forest**    | **gradient**  |
+|--------------|---------------|---------------|---------------|---------------|
+| **random**   | 1             | 6\.31757E\-10 | 1             | 0\.055983678  |
+| **bayesian** | 6\.31757E\-10 | 1             | 4\.84375E\-08 | 5\.09448E\-15 |
+| **forest**   | 1             | 4\.84375E\-08 | 1             | 0\.002694824  |
+| **gradient** | 0\.055983678  | 5\.09448E\-15 | 0\.002694824  | 1             |
+
+Looking at all the instances, we conclude, that the gradient method often differs from the rest, and that forest and gradient optimization share similarities, when the bayesian method shows a different distribution.
+
+Lastly, we look at the Mann–Whitney U test results for all previous H0-rejects:
+
+### eil51 ###
+|           | random       | bayesian     |              | forest       |             | gradient     |              |              |
+|-----------|--------------|--------------|--------------|--------------|-------------|--------------|--------------|--------------|
+|           | gradient     | forest       | gradient     | bayesian     | gradient    | random       | bayesian     | forest       |
+| statistic | 81           | 73           | 81           | 8            | 81          | 0            | 0            | 0            |
+| pvalue    | 0\.999941945 | 0\.998486065 | 0\.999922184 | 0\.048475771 | 0\.99991171 | 0\.002037388 | 0\.002694615 | 0\.003039724 |
+
+### berlin52 ###
+|           | random      | bayesian    |             |             | forest      |             | gradient    |            |   |
+|-----------|-------------|-------------|-------------|-------------|-------------|-------------|-------------|------------|---|
+|           | bayesian    | random      | forest      | gradient    | bayesian    | gradient    | bayesian    | forest     |   |
+| statisitc | 0           | 81          | 81          | 81          | 0           | 81          | 0           | 0          |   |
+| pvalue    | 0.001464753 | 0.999958917 | 0.999962496 | 0.999955084 | 0.001342765 | 0.999907242 | 0.001594884 | 0.00318639 |   |
+
+
+While eil51 shows, that gradient optimization performs better than all other methods, berlin52 confirms this in case of bayesian and forest and also suggests, that all methods outperform bayesian optimization.
 
 In summary, the gradient boosted regression trees algorithm has the fastest convergence with the best solution qualities while delivering the second most robust results. Therefore, it will be used for conducting part two of the test procedure.
 
@@ -301,6 +337,9 @@ In summary, the gradient boosted regression trees algorithm has the fastest conv
 
 <a id='13'>[13]</a> Tim Head, "Comparing surrogate models". https://scikit-optimize.github.io/stable/auto_examples/strategy-comparison.html#sphx-glr-auto-examples-strategy-comparison-py, 2016.
 
+<a id='14'>[14]</a> H. B. Mann, D. R. Whitney "On a Test of Whether one of Two Random Variables is Stochastically Larger than the Other," The Annals of Mathematical Statistics, Ann. Math. Statist. 18(1), 50-60, (March, 1947)
+
+<a id='15'>[15]</a> Conover, W. Jay; Iman, Ronald L. (1979). "On multiple-comparisons procedures" (PDF) (Report). Los Alamos Scientific Laboratory. Retrieved 2016-10-28
 
 
 

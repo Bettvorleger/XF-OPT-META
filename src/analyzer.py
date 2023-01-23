@@ -462,7 +462,7 @@ class Analyzer:
             - kwh + conover: Kruskal-Wallis test + Post-Hoc Conover-Iman test
             - mannwhitneyu: (only for h0-rejects of Conover's test) the bonferroni corrected p-value of the one-sided (lesser) Mann–Whitney U test
 
-        Note: the often as similar regarded Friedman test is not used, since assumes the values to be paired or dependent,
+        Note: the often as similar to the Kruskal-Wallis test regarded Friedman test is not used, since assumes the values to be paired or dependent,
         which this data is not, since each measurement is taken from a differently initialized algorithm. 
 
         Args:
@@ -506,7 +506,7 @@ class Analyzer:
         kwh = kruskal(*mean_min_val_list)
         tests['kwh'] = {'statistic': kwh[0], 'pvalue': kwh[1]}
 
-        if kwh[1] <= 0.05:  # al h0 of Kruskal-Wallis test are post-hox checked via Conover-Iman test
+        if kwh[1] <= 0.05:  # h0 reject of Kruskal-Wallis test is post-hoc checked via Conover-Iman test
             conover = sp.posthoc_conover(mean_min_val_list, p_adjust='bonf')
             conover.columns, conover.index = mean_min_key_list, mean_min_key_list
 
@@ -525,7 +525,7 @@ class Analyzer:
                         mwu = mannwhitneyu(
                             x[start_iteration:], y[start_iteration:], alternative='less')
                         tests['mwu'][k][k2] = {
-                            'statisitc': mwu[0], 'pvalue': mwu[1]*bonf_cor if mwu[1] < (0.05/bonf_cor) else mwu[1]}
+                            'statistic': mwu[0], 'pvalue': mwu[1]*bonf_cor if mwu[1] < (0.05/bonf_cor) else mwu[1]}
 
         for k, v in stats.items():
             # v.pop('mean_mins')
