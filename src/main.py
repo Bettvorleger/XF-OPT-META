@@ -67,6 +67,8 @@ def check_percent_range(number: float) -> float:
 #       - comparing opt params (boxplots, partial dependence plot, variance_inflation_factor, importance via PCA https://betterdatascience.com/feature-importance-python/)
 #       - comparing exp runs (avg run analysis)
 
+# instead of Mann Whitney U test, just get test statistic of Conover Iman and argue with that, NO Mann Whitney test
+
 # TODO code(optional):
 #   - implement tests
 #   - web UI (flask) and better packaging

@@ -1,6 +1,9 @@
 from scipy.optimize import OptimizeResult
-from scipy.stats import wilcoxon, kruskal, mannwhitneyu
+import scipy.stats as ss
 import scikit_posthocs as sp
+import itertools as it
+from statsmodels.sandbox.stats.multicomp import multipletests
+from typing import Union
 from problem import Problem
 from tsp import TSP
 from config import output_folder_prefix, params
@@ -503,17 +506,20 @@ class Analyzer:
         mean_min_key_list = [x for x in stats.keys()]
         mean_min_val_list = [np.mean(x['mean_mins'], axis=0)
                              for x in stats.values()]
-        kwh = kruskal(*mean_min_val_list)
+        kwh = ss.kruskal(*mean_min_val_list)
         tests['kwh'] = {'statistic': kwh[0], 'pvalue': kwh[1]}
 
         if kwh[1] <= 0.05:  # h0 reject of Kruskal-Wallis test is post-hoc checked via Conover-Iman test
-            conover = sp.posthoc_conover(mean_min_val_list, p_adjust='bonf')
-            conover.columns, conover.index = mean_min_key_list, mean_min_key_list
+            sp.posthoc_conover = posthoc_conover
+            conover_t, conover_p = sp.posthoc_conover(mean_min_val_list, p_adjust='bonf')
+            conover_p.columns, conover_p.index = mean_min_key_list, mean_min_key_list
+            conover_t.columns, conover_t.index = mean_min_key_list, mean_min_key_list
 
-            con_h0 = (conover < 0.05)
+            con_h0 = (conover_p < 0.05)
             # number of previous pairwise tests (conover) plus the to be executed mwu tests
             bonf_cor = len(mean_min_val_list)**2 + con_h0.to_numpy().sum()
-            tests['conover'] = conover.to_dict()
+            tests['conover_t'] = conover_t.to_dict()
+            tests['conover_p'] = conover_p.to_dict()
 
             tests['mwu'] = {}
             for k, v in con_h0.to_dict().items():
@@ -522,7 +528,7 @@ class Analyzer:
                     if k is not k2 and v2:
                         x = np.mean(stats[k]['mean_mins'], axis=0)
                         y = np.mean(stats[k2]['mean_mins'], axis=0)
-                        mwu = mannwhitneyu(
+                        mwu = ss.mannwhitneyu(
                             x[start_iteration:], y[start_iteration:], alternative='less')
                         tests['mwu'][k][k2] = {
                             'statistic': mwu[0], 'pvalue': mwu[1]*bonf_cor if mwu[1] < (0.05/bonf_cor) else mwu[1]}
@@ -818,3 +824,63 @@ def create_problem_cluster(metadata_filepath='../problems/metadata.json', output
         fig.show()
         fig.write_image(output_filepath+"clusters_kmeans.png",
                         scale=3, width=850, height=800)
+
+def posthoc_conover(
+        a: Union[list, np.ndarray, pd.DataFrame],
+        val_col: str = None,
+        group_col: str = None,
+        p_adjust: str = None,
+        sort: bool = True) -> tuple[pd.DataFrame, pd.DataFrame]:
+
+    def compare_conover(i, j):
+        diff = np.abs(x_ranks_avg.loc[i] - x_ranks_avg.loc[j])
+        B = (1. / x_lens.loc[i] + 1. / x_lens.loc[j])
+        D = (n - 1. - h_cor) / (n - x_len)
+        t_value = diff / np.sqrt(S2 * B * D)
+        p_value = 2. * ss.t.sf(np.abs(t_value), df=n-x_len)
+        return t_value, p_value
+
+    x, _val_col, _group_col = sp.__convert_to_df(a, val_col, group_col)
+    x = x.sort_values(by=[_group_col, _val_col], ascending=True) if sort else x
+
+    n = len(x.index)
+    x_groups_unique = x[_group_col].unique()
+    x_len = x_groups_unique.size
+    x_lens = x.groupby(_group_col)[_val_col].count()
+
+    x['ranks'] = x[_val_col].rank()
+    x_ranks_avg = x.groupby(_group_col)['ranks'].mean()
+    x_ranks_sum = x.groupby(_group_col)['ranks'].sum()
+
+    # ties
+    vals = x.groupby('ranks').count()[_val_col].values
+    tie_sum = np.sum(vals[vals != 1] ** 3 - vals[vals != 1])
+    tie_sum = 0 if not tie_sum else tie_sum
+    x_ties = np.min([1., 1. - tie_sum / (n ** 3. - n)])
+
+    h = (12. / (n * (n + 1.))) * np.sum(x_ranks_sum**2 / x_lens) - 3. * (n + 1.)
+    h_cor = h / x_ties
+
+    if x_ties == 1:
+        S2 = n * (n + 1.) / 12.
+    else:
+        S2 = (1. / (n - 1.)) * (np.sum(x['ranks'] ** 2.) - (n * (((n + 1.)**2.) / 4.)))
+
+    vs = np.zeros((x_len, x_len))
+    tvs = np.zeros((x_len, x_len))
+    tri_upper = np.triu_indices(vs.shape[0], 1)
+    tri_lower = np.tril_indices(vs.shape[0], -1)
+    vs[:, :] = 0
+    tvs[:, :] = 0
+
+    combs = it.combinations(range(x_len), 2)
+
+    for i, j in combs:
+        tvs[i, j], vs[i, j] = compare_conover(x_groups_unique[i], x_groups_unique[j])
+
+    if p_adjust:
+        vs[tri_upper] = multipletests(vs[tri_upper], method=p_adjust)[1]
+    vs[tri_lower] = np.transpose(vs)[tri_lower]
+    np.fill_diagonal(vs, 1)
+
+    return pd.DataFrame(tvs, index=x_groups_unique, columns=x_groups_unique), pd.DataFrame(vs, index=x_groups_unique, columns=x_groups_unique)
