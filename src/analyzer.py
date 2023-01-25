@@ -463,7 +463,6 @@ class Analyzer:
             - min: the absolute minimal solution quality found during optimization
             - auc: the area under the curve of a results convergence graph, averaged over all runs 
             - kwh + conover: Kruskal-Wallis test + Post-Hoc Conover-Iman test
-            - mannwhitneyu: (only for h0-rejects of Conover's test) the bonferroni corrected p-value of the one-sided (lesser) Mann–Whitney U test
 
         Note: the often as similar to the Kruskal-Wallis test regarded Friedman test is not used, since assumes the values to be paired or dependent,
         which this data is not, since each measurement is taken from a differently initialized algorithm. 
@@ -515,23 +514,8 @@ class Analyzer:
             conover_p.columns, conover_p.index = mean_min_key_list, mean_min_key_list
             conover_t.columns, conover_t.index = mean_min_key_list, mean_min_key_list
 
-            con_h0 = (conover_p < 0.05)
-            # number of previous pairwise tests (conover) plus the to be executed mwu tests
-            bonf_cor = len(mean_min_val_list)**2 + con_h0.to_numpy().sum()
             tests['conover_t'] = conover_t.to_dict()
             tests['conover_p'] = conover_p.to_dict()
-
-            tests['mwu'] = {}
-            for k, v in con_h0.to_dict().items():
-                tests['mwu'][k] = {}
-                for k2, v2 in v.items():
-                    if k is not k2 and v2:
-                        x = np.mean(stats[k]['mean_mins'], axis=0)
-                        y = np.mean(stats[k2]['mean_mins'], axis=0)
-                        mwu = ss.mannwhitneyu(
-                            x[start_iteration:], y[start_iteration:], alternative='less')
-                        tests['mwu'][k][k2] = {
-                            'statistic': mwu[0], 'pvalue': mwu[1]*bonf_cor if mwu[1] < (0.05/bonf_cor) else mwu[1]}
 
         for k, v in stats.items():
             # v.pop('mean_mins')
@@ -833,11 +817,12 @@ def posthoc_conover(
         sort: bool = True) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     def compare_conover(i, j):
-        diff = np.abs(x_ranks_avg.loc[i] - x_ranks_avg.loc[j])
+        diff = x_ranks_avg.loc[i] - x_ranks_avg.loc[j]
         B = (1. / x_lens.loc[i] + 1. / x_lens.loc[j])
         D = (n - 1. - h_cor) / (n - x_len)
         t_value = diff / np.sqrt(S2 * B * D)
-        p_value = 2. * ss.t.sf(np.abs(t_value), df=n-x_len)
+        t_value_p = np.abs(diff) / np.sqrt(S2 * B * D)
+        p_value = 2. * ss.t.sf(np.abs(t_value_p), df=n-x_len)
         return t_value, p_value
 
     x, _val_col, _group_col = sp.__convert_to_df(a, val_col, group_col)

@@ -216,10 +216,7 @@ Since our comparison of optimization methods is non-parametric, which rules out 
 It already takes into account the number of groups and does not need a separate correction of the Type I or multiple comparisons error.
 We choose a standard significance level of 0.05 to reject the null hypothesis. 
 
-To further compare the runs we conduct a post-hoc test in case of a H0 rejection. Using the same assumptions as before, there are multiple applicable tests after a Kruskal–Wallis H test, the most popular being the Dunn's test. However, we choose the lesser known, but supposedly more significant Conover–Iman test [[15]](#15). This test conducts multiple pairwise comparisons out of all group members, each result giving a p-value in accordance to the null hypothesis of coming from the same distribution. Since multiple tests are performed on the same dataset, there is a need for correcting the Type I error. Using a simple Bonferroni correction, we gain more false positive H0-rejects (smaller p-values), but also less false negatives, which is fine in our case of having multiple other measures to use as well.
-
-As a last test, we conduct a Mann–Whitney U test on all H0-rejects of the Conover-Iman test to find out, if one group, being the convergence behavior of an optimization method, has significantly larger solutions than the other. This test is comparable to the Wilcoxon signed-rank test, which also uses the summation of ranks, but assumes the data to be matched or dependent, which is not the case here. It is also more usual to conduct a two-sided Wilcoxon test, which formulates a null hypothesis of having the identical distribution for both groups. The Mann–Whitney U test, however, was orignally proposed to test "whether one of Two Random Variables is Stochastically Larger than the Other" [[14]](#14), which is exactly what we want. Again, to address concerns about the multiple comparisons error, a Bonferroni correction is being applied, that also takes into account the number of tests done during the Conover-Iman test.
-
+To further compare the runs we conduct a post-hoc test in case of a H0 rejection. Using the same assumptions as before, there are multiple applicable tests after a Kruskal–Wallis H test, the most popular being the Dunn's test. However, we choose the lesser known, but supposedly more significant Conover–Iman test [[14]](#14). This test conducts multiple pairwise comparisons out of all group members, each result giving a p-value in accordance to the null hypothesis of coming from the same distribution. Since multiple tests are performed on the same dataset, there is a need for correcting the Type I error. Using a simple Bonferroni correction, we gain more false positive H0-rejects (smaller p-values), but also less false negatives, which is fine in our case of having multiple other measures to use as well.
 
 All of the evaluations mentioned above start after iteration 10, because the first ten iterations are randomly sampled and do not reflect the model/algorithm behavior.
 Furthermore, the minimal solution quality obtained for each algorithm and each problem instance is being exported.
@@ -288,25 +285,6 @@ The following test results for berlin52 suggest, that bayesian optimization some
 
 Looking at all the instances, we conclude, that the gradient method often differs from the rest, and that forest and gradient optimization share similarities, when the bayesian method shows a different distribution.
 
-Lastly, we look at the Mann–Whitney U test results for all previous H0-rejects:
-
-### eil51 ###
-|           | random       | bayesian     |              | forest       |             | gradient     |              |              |
-|-----------|--------------|--------------|--------------|--------------|-------------|--------------|--------------|--------------|
-|           | gradient     | forest       | gradient     | bayesian     | gradient    | random       | bayesian     | forest       |
-| statistic | 81           | 73           | 81           | 8            | 81          | 0            | 0            | 0            |
-| pvalue    | 0\.999941945 | 0\.998486065 | 0\.999922184 | 0\.048475771 | 0\.99991171 | 0\.002037388 | 0\.002694615 | 0\.003039724 |
-
-### berlin52 ###
-|           | random      | bayesian    |             |             | forest      |             | gradient    |            |   |
-|-----------|-------------|-------------|-------------|-------------|-------------|-------------|-------------|------------|---|
-|           | bayesian    | random      | forest      | gradient    | bayesian    | gradient    | bayesian    | forest     |   |
-| statisitc | 0           | 81          | 81          | 81          | 0           | 81          | 0           | 0          |   |
-| pvalue    | 0.001464753 | 0.999958917 | 0.999962496 | 0.999955084 | 0.001342765 | 0.999907242 | 0.001594884 | 0.00318639 |   |
-
-
-While eil51 shows, that gradient optimization performs better than all other methods, berlin52 confirms this in case of bayesian and forest and also suggests, that all methods outperform bayesian optimization.
-
 In summary, the gradient boosted regression trees algorithm has the fastest convergence with the best solution qualities while delivering the second most robust results. Therefore, it will be used for conducting part two of the test procedure.
 
 ## References
@@ -337,9 +315,7 @@ In summary, the gradient boosted regression trees algorithm has the fastest conv
 
 <a id='13'>[13]</a> Tim Head, "Comparing surrogate models". https://scikit-optimize.github.io/stable/auto_examples/strategy-comparison.html#sphx-glr-auto-examples-strategy-comparison-py, 2016.
 
-<a id='14'>[14]</a> H. B. Mann, D. R. Whitney "On a Test of Whether one of Two Random Variables is Stochastically Larger than the Other," The Annals of Mathematical Statistics, Ann. Math. Statist. 18(1), 50-60, (March, 1947)
-
-<a id='15'>[15]</a> Conover, W. Jay; Iman, Ronald L. (1979). "On multiple-comparisons procedures" (PDF) (Report). Los Alamos Scientific Laboratory. Retrieved 2016-10-28
+<a id='15'>[14]</a> Conover, W. Jay; Iman, Ronald L. (1979). "On multiple-comparisons procedures" (PDF) (Report). Los Alamos Scientific Laboratory. Retrieved 2016-10-28
 
 
 
