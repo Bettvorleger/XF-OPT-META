@@ -212,6 +212,7 @@ class Logger:
         io_file = self.create_file_wrapper(
             "opt_log_"+str(run)+".pkl", mode='wb')
         io_file.write(pickle.dumps(opt_results))
+        io_file.close()
 
         opt_results.func_vals = list(opt_results.func_vals)
         io_file = self.create_file_wrapper("opt_log_"+str(run)+".json")

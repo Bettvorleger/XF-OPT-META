@@ -64,10 +64,9 @@ def check_percent_range(number: float) -> float:
 #   - all modes: add relative difference to optimal solution to run and exp output
 #   - analyzer:
 #       - comparing opt methods (convergence plot), wilcoxon signed rank test (https://en.wikipedia.org/wiki/Wilcoxon_signed-rank_test)
-#       - comparing opt params (boxplots, partial dependence plot, variance_inflation_factor, importance via PCA https://betterdatascience.com/feature-importance-python/)
-#       - comparing exp runs (avg run analysis)
+#       - comparing opt params (boxplots, partial dependence plot, variance_inflation_factor, feature importance)
+#       - comparing exp runs (avg run analysis, , calc precision/recall and roc curve for reset accuracy)
 
-# instead of Mann Whitney U test, just get test statistic of Conover Iman and argue with that, NO Mann Whitney test
 
 # TODO code(optional):
 #   - implement tests
@@ -117,8 +116,9 @@ def main():
             n_runs = args.runs if args.runs != 0 else get_run_number()
 
             for d in range(1, dynamic_num+1):
-                problem.set_dynamic(
-                    dynamic_intensity_pct=params['exp']['problem'][0][d])
+                if args.test_dynamic:
+                    problem.set_dynamic(
+                        dynamic_intensity_pct=params['exp']['problem'][0][d])
                 logger.init_mode(n_runs)
 
                 for n in range(1, n_runs+1):
@@ -151,8 +151,10 @@ def main():
             opt = Optimizer(opt_algo, hsppbo.execute_wrapper,
                             params['opt']['hsppbo'])
             for d in range(1, dynamic_num+1):
-                problem.set_dynamic(
-                    dynamic_intensity_pct=params['opt']['problem'][0][d])
+                if args.test_dynamic:
+                    problem.set_dynamic(
+                        dynamic_intensity_pct=params['opt']['problem'][0][d])
+                
                 logger.init_mode(params['opt']['hsppbo'], opt_algo)
 
                 for n in range(1, n_runs+1):

@@ -187,8 +187,6 @@ class Analyzer:
                 results = pd.concat(
                     [results, res], ignore_index=True, sort=False)
 
-        print(results)
-
         y1 = ["alpha", "beta"]
         y2 = ['w_pers_best', 'w_pers_prev', 'w_parent_best']
         if 'detection_threshold' in results.columns:
@@ -395,11 +393,15 @@ class Analyzer:
         opt = get_optimizer_type(folder['info.json'])
 
         results = load_opt_result(folder)
-
         dimensions = [d[0] for d in params[self.mode][self.obj_algorithm]]
-        for i, res in enumerate(results):
-            plot_objective(res, dimensions=dimensions, n_points=n_points)
-            plt.suptitle('Partial Dependence (opt_%d, %s, %s [C=%d], run %d of %d)' %
+        # remove reaction_type value, because expressiveness for two type categorical value is very low
+        if 'reaction_type' in dimensions:
+            dimensions.remove('reaction_type')
+
+        for i, res in enumerate(results[:1]):
+            plot_objective(res, dimensions=dimensions, plot_dims=[
+                           0, 1, 2, 3, 4, 5], n_points=n_points)
+            plt.suptitle('Partial Dependence (opt_%d, %s, %s [C=%.2f], run %d of %d)' %
                          (result_num, opt, problem, dynamic_intensity, i+1, len(results)))
 
         plt.show()
@@ -510,7 +512,8 @@ class Analyzer:
 
         if kwh[1] <= 0.05:  # h0 reject of Kruskal-Wallis test is post-hoc checked via Conover-Iman test
             sp.posthoc_conover = posthoc_conover
-            conover_t, conover_p = sp.posthoc_conover(mean_min_val_list, p_adjust='bonf')
+            conover_t, conover_p = sp.posthoc_conover(
+                mean_min_val_list, p_adjust='bonf')
             conover_p.columns, conover_p.index = mean_min_key_list, mean_min_key_list
             conover_t.columns, conover_t.index = mean_min_key_list, mean_min_key_list
 
@@ -597,6 +600,13 @@ class Analyzer:
             return files
         return None
 
+    def get_best_param_set(self, result_num: int) -> list[int, list]:
+        folder = self.load_result_folder(result_num)
+        params = load_opt_best_params(folder['opt_best_params.csv'], True)
+        best_params = params.iloc[params['func_val'].idxmin()]
+        print(best_params.to_dict())
+
+
     def create_file_wrapper(self, result_num: int, filename: str, mode='a') -> None:
         """
         Initializes a file wrapper for logging
@@ -610,10 +620,13 @@ class Analyzer:
         return open("".join(self.results_path, self.path_prefix, str(result_num), '/', filename), mode)
 
 
-def load_opt_best_params(path: str) -> pd.DataFrame:
+def load_opt_best_params(path: str, func_val=False) -> pd.DataFrame:
     try:
         df = pd.read_csv(path, sep=';')
-        df = df.loc[:, ~df.columns.isin(['run', 'func_val'])]
+        if func_val:
+            df = df.loc[:, ~df.columns.isin(['run'])]
+        else:
+            df = df.loc[:, ~df.columns.isin(['run', 'func_val'])]
     except:
         raise FileExistsError(
             'File "opt_best_params.csv" not found in current folder')
@@ -809,6 +822,7 @@ def create_problem_cluster(metadata_filepath='../problems/metadata.json', output
         fig.write_image(output_filepath+"clusters_kmeans.png",
                         scale=3, width=850, height=800)
 
+
 def posthoc_conover(
         a: Union[list, np.ndarray, pd.DataFrame],
         val_col: str = None,
@@ -843,13 +857,15 @@ def posthoc_conover(
     tie_sum = 0 if not tie_sum else tie_sum
     x_ties = np.min([1., 1. - tie_sum / (n ** 3. - n)])
 
-    h = (12. / (n * (n + 1.))) * np.sum(x_ranks_sum**2 / x_lens) - 3. * (n + 1.)
+    h = (12. / (n * (n + 1.))) * \
+        np.sum(x_ranks_sum**2 / x_lens) - 3. * (n + 1.)
     h_cor = h / x_ties
 
     if x_ties == 1:
         S2 = n * (n + 1.) / 12.
     else:
-        S2 = (1. / (n - 1.)) * (np.sum(x['ranks'] ** 2.) - (n * (((n + 1.)**2.) / 4.)))
+        S2 = (1. / (n - 1.)) * \
+            (np.sum(x['ranks'] ** 2.) - (n * (((n + 1.)**2.) / 4.)))
 
     vs = np.zeros((x_len, x_len))
     tvs = np.zeros((x_len, x_len))
@@ -861,7 +877,8 @@ def posthoc_conover(
     combs = it.combinations(range(x_len), 2)
 
     for i, j in combs:
-        tvs[i, j], vs[i, j] = compare_conover(x_groups_unique[i], x_groups_unique[j])
+        tvs[i, j], vs[i, j] = compare_conover(
+            x_groups_unique[i], x_groups_unique[j])
 
     if p_adjust:
         vs[tri_upper] = multipletests(vs[tri_upper], method=p_adjust)[1]

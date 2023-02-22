@@ -110,7 +110,7 @@ class SCETree:
             IndexError: Node in first argument has to be a child of the parent node in the second argument
         """
 
-        # Getting a deep copy of the childs succesors list for assignment to parent node
+        # Getting a deep copy of the child's successors list for assignment to parent node
         cn = self.tree.get_node(child)
         cn_successors = copy.deepcopy(cn._successors)
         pn = self.tree.get_node(parent)
@@ -127,7 +127,7 @@ class SCETree:
         for pc in self.tree.children(parent):
             pc._predecessor[self.tree._identifier] = child
 
-        # Change childs of the grandparent (parent of parent) to former child
+        # Change child's of the grandparent (parent of parent) to former child
         # or assign former child as tree root, if parent was root
         if self.tree.level(parent) > 0:
             gp = self.tree.parent(parent)
