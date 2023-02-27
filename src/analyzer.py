@@ -603,8 +603,9 @@ class Analyzer:
     def get_best_param_set(self, result_num: int) -> list[int, list]:
         folder = self.load_result_folder(result_num)
         params = load_opt_best_params(folder['opt_best_params.csv'], True)
+        info = get_info(folder['info.json'])
         best_params = params.iloc[params['func_val'].idxmin()]
-        print(best_params.to_dict())
+        print(info['problem']['name'], info['problem']['dynamic_props']['dynamic_intensity'], best_params.to_dict())
 
 
     def create_file_wrapper(self, result_num: int, filename: str, mode='a') -> None:
