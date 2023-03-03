@@ -16,6 +16,8 @@ def user_input():
                         'run', 'opt', 'exp'], default='run', help='Mode of execution for the given problem and/or algorithm')
     parser.add_argument('-i', '--runs', type=int, default=0,
                         help='Number of runs to execute consecutively')
+    parser.add_argument('-cr', '--continue-run', type=int, default=0,
+                        help='Run number from which the calculations shall be continued (only opt mode)')
     parser.add_argument('-td', '--test-dynamic',
                         help="Set, if all dynamic intensities (set in the config for the respective mode) shall be tested", action='store_true')
     parser.add_argument('-p', '--problem', type=str, default='rat195',
@@ -154,10 +156,10 @@ def main():
                 if args.test_dynamic:
                     problem.set_dynamic(
                         dynamic_intensity_pct=params['opt']['problem'][0][d])
-                
+
                 logger.init_mode(params['opt']['hsppbo'], opt_algo)
 
-                for n in range(1, n_runs+1):
+                for n in range(1+args.continue_run, n_runs+1):
                     print("---STARTING OPTIMIZATION RUN " +
                           str(n) + "/" + str(n_runs) + " AND DYNAMIC CONF " + str(d) + "/" + str(dynamic_num) + "---")
                     opt_res = opt.run(verbose=args.verbose,

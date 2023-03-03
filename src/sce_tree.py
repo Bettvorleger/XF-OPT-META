@@ -40,7 +40,7 @@ class SCETree:
 
     def init_tree(self):
         """
-        Initialize the SCE tree a k-ary tree (depens on chƒilds value)
+        Initialize the SCE tree a k-ary tree (depends on childs value)
         and give each SCE node initial random values.
         """
 
