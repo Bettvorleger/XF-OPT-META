@@ -1,0 +1,249 @@
+% !TeX document-id = {ae1fcf0c-b497-46b7-bdf7-8dda67a9e27e}
+% !TeX spellcheck = en-US
+% !TeX encoding = utf8
+% !TeX program = pdflatex
+% !BIB program = biber
+
+
+\let\ifdeutsch\iffalse
+\let\ifenglisch\iftrue
+\input{pre-documentclass}
+\documentclass[
+  fontsize=12pt,
+  a4paper,  % Standard format - only KOMAScript uses paper=a4 - https://tex.stackexchange.com/a/61044/9075
+  twoside,  % we are optimizing for both screen and two-side printing. So the page numbers will jump, but the content is configured to stay in the middle (by using the geometry package)
+  bibliography=totoc,
+  %               idxtotoc,   %Index ins Inhaltsverzeichnis
+  %               liststotoc, %List of X ins Inhaltsverzeichnis, mit liststotocnumbered werden die Abbildungsverzeichnisse nummeriert
+  headsepline,
+  cleardoublepage=empty,
+  parskip=half,
+  %               draft    % um zu sehen, wo noch nachgebessert werden muss - wichtig, da Bindungskorrektur mit drin
+  draft=false
+]{scrbook}
+\input{config}
+\linespread{1.2}
+
+\usepackage[chapter]{minted}
+\setminted{numbersep=5pt, xleftmargin=12pt}
+%%%
+
+%http://www.jevon.org/wiki/Eclipse_Pygments_Style
+%\usemintedstyle{eclipse}
+%
+%\usemintedstyle{autumn}
+%\usemintedstyle{rrt}
+%\usemintedstyle{borland}
+%\usemintedstyle{friendlygrayscale}
+\usemintedstyle{friendly}
+
+%EN: compatibility of packages minted and listings with respect to the numbering of "List." caption
+%    source: https://tex.stackexchange.com/a/269510/9075
+\AtBeginEnvironment{listing}{\setcounter{listing}{\value{lstlisting}}}
+\AtEndEnvironment{listing}{\stepcounter{lstlisting}}
+%EN: We use the Listing environment to have the nice bar. So, we also have to patch the "Listing" environment for consistent counters
+\AtBeginEnvironment{Listing}{\setcounter{listing}{\value{lstlisting}}}
+\AtEndEnvironment{Listing}{\stepcounter{lstlisting}}
+
+
+\input{acronyms}
+
+\makeindex
+
+\begin{document}
+
+%tex4ht-Konvertierung verschönern
+\iftex4ht
+  % tell tex4ht to create picures also for formulas starting with '$'
+  % WARNING: a tex4ht run now takes forever!
+  \Configure{$}{\PicMath}{\EndPicMath}{}
+  %$ % <- syntax highlighting fix for emacs
+  \Css{body {text-align:justify;}}
+
+  %conversion of .pdf to .png
+  \Configure{graphics*}
+  {pdf}
+  {\Needs{"convert \csname Gin@base\endcsname.pdf
+      \csname Gin@base\endcsname.png"}%
+    \Picture[pict]{\csname Gin@base\endcsname.png}%
+  }
+\fi
+
+%\VerbatimFootnotes %verbatim text in Fußnoten erlauben. Geht normalerweise nicht.
+
+\input{commands}
+\pagenumbering{arabic}
+
+%\Titelblatt
+\begin{titlepage}
+	\begin{center}
+		
+		
+		\Large
+		Leipzig University\\
+		Faculty of Mathematics and Computer Science
+		
+		\vspace{2.5cm}
+		
+		\Huge
+		\textbf{Hyperparameter Optimization Methods for the H-SPPBO Metaheuristic}
+		
+		\vspace{0.5cm}
+		\Large
+		Applied to the Dynamic Traveling Salesperson Problem
+		
+		\vspace{1cm}
+		
+		
+		Master's Thesis
+		
+		\vspace{2cm}
+
+		
+		\begin{minipage}{0.4\textwidth}
+			\vspace{0.05\linewidth}
+			\begin{flushleft} \large
+				\emph{Author:}\\
+				Daniel Werner\\
+				{\small 3742529\\
+					\vspace{-0.3cm}
+					Computer Science}
+			\end{flushleft}
+		\end{minipage}
+		\begin{minipage}{0.4\textwidth}
+			\begin{flushright} \large
+				\emph{Supervisor:} \\
+				Prof.\ Dr.\ Martin Middendorf\\
+				\hfil
+			\end{flushright}
+		\end{minipage}
+		\vfill
+		
+	
+		\large Swarm Intelligence and Complex Systems Group\\
+		
+		{\large \today}
+		
+			\end{center}
+	\end{titlepage}
+
+%Eigener Seitenstil fuer die Kurzfassung und das Inhaltsverzeichnis
+\deftriplepagestyle{preamble}{}{}{}{}{}{\pagemark}
+%Doku zu deftriplepagestyle: scrguide.pdf
+\pagestyle{preamble}
+\renewcommand*{\chapterpagestyle}{preamble}
+
+
+% BEGIN: Verzeichnisse
+
+\iftex4ht
+\else
+  \microtypesetup{protrusion=false}
+\fi
+
+%%%
+% Literaturverzeichnis ins TOC mit aufnehmen, aber nur wenn nichts anderes mehr hilft!
+% \addcontentsline{toc}{chapter}{Literaturverzeichnis}
+%
+% oder zB
+%\addcontentsline{toc}{section}{Abkürzungsverzeichnis}
+%
+%%%
+
+%Produce table of contents
+%
+%In case you have trouble with headings reaching into the page numbers, enable the following three lines.
+%Hint by http://golatex.de/inhaltsverzeichnis-schreibt-ueber-rand-t3106.html
+%
+%\makeatletter
+%\renewcommand{\@pnumwidth}{2em}
+%\makeatother
+%
+\tableofcontents
+
+% Bei einem ungünstigen Seitenumbruch im Inhaltsverzeichnis, kann dieser mit
+% \addtocontents{toc}{\protect\newpage}
+% an der passenden Stelle im Fließtext erzwungen werden.
+
+
+\iftex4ht
+\else
+  %Optischen Randausgleich und Grauwertkorrektur wieder aktivieren
+  \microtypesetup{protrusion=true}
+\fi
+
+% END: Verzeichnisse
+
+
+% Headline and footline
+\renewcommand*{\chapterpagestyle}{scrplain}
+\pagestyle{scrheadings}
+\pagestyle{scrheadings}
+\ihead[]{}
+\chead[]{}
+\ohead[]{\headmark}
+\cfoot[]{}
+\ofoot[\usekomafont{pagenumber}\thepage]{\usekomafont{pagenumber}\thepage}
+\ifoot[]{}
+
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Main content starts here
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\input{introduction}
+
+\input{related}
+
+\input{background}
+
+\input{implementation}
+
+\input{experiments}
+
+\input{results}
+
+\input{conclusions}
+
+\chapter*{Abstract}
+
+<Short summary of the thesis>
+
+\printbibliography
+
+%All links were last followed on March 1, 2023.
+
+% Abkürzungsverzeichnis
+\printnoidxglossaries
+
+\listoffigures
+\listoftables
+
+%Wird nur bei Verwendung von der lstlisting-Umgebung mit dem "caption"-Parameter benoetigt
+%\lstlistoflistings
+%ansonsten:
+\listof{Listing}{List of Listings}
+
+%mittels \newfloat wurde die Algorithmus-Gleitumgebung definiert.
+%Mit folgendem Befehl werden alle floats dieses Typs ausgegeben
+%\listof{Algorithmus}{List of Algorithms}
+\listofalgorithms %Ist nur für Algorithmen, die mittels \begin{algorithm} umschlossen werden, nötig
+
+
+\appendix
+
+%\input{latexhints-english}
+
+\pagestyle{empty}
+\renewcommand*{\chapterpagestyle}{empty}
+
+\end{document}
