@@ -66,8 +66,8 @@ def check_percent_range(number: float) -> float:
 #   - all modes: add relative difference to optimal solution to run and exp output
 #   - analyzer:
 #       - comparing opt methods (convergence plot), wilcoxon signed rank test (https://en.wikipedia.org/wiki/Wilcoxon_signed-rank_test)
-#       - comparing opt params (boxplots, partial dependence plot, variance_inflation_factor, feature importance)
-#       - comparing exp runs (avg run analysis, , calc precision/recall and roc curve for reset accuracy)
+#       - comparing opt params (boxplots, partial dependence plot, feature importance)
+#       - comparing exp runs (avg run analysis, alc precision/recall and roc curve for reset accuracy)
 
 
 # TODO code(optional):

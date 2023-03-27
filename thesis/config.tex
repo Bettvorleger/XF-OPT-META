@@ -266,6 +266,11 @@
 %     See http://tex.stackexchange.com/questions/91566/syntax-similar-to-centering-for-right-and-left
 \usepackage{ragged2e}
 
+\usepackage{makecell}
+\renewcommand\theadgape{\Gape[4pt]}
+\renewcommand\cellgape{\Gape[4pt]}
+%\renewcommand\theadfont{\bfseries}
+\renewcommand\theadfont{\normalsize}
 
 % DE: Wichtig, ansonsten erscheint "No room for a new \write"
 \usepackage{scrwfile}
@@ -1142,6 +1147,13 @@
 % EN: Package for creating graphics programmatically
 \usepackage{tikz}
 \usetikzlibrary{calc,arrows.meta,angles,bending,quotes}
+\usetikzlibrary{matrix}
+\tikzset{matrixlayer/.style={
+		matrix of math nodes,nodes in empty cells,
+		nodes={draw=#1,fill=#1!15,minimum size=13.5mm,anchor=center,text=black},
+		column sep=-.2*\pgflinewidth,
+		row sep=-.1*\pgflinewidth
+}}
 
 \usepackage[edges]{forest}
 

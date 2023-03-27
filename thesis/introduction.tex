@@ -3,6 +3,7 @@
 % !TeX encoding = utf8
 
 \chapter{Introduction}
+\label{chap:introduction}
 
 \section{Motivation}
 
@@ -23,6 +24,7 @@ This opens up the scope of this thesis to dynamically changing problems, like th
 
 
 \section{Approach}
+\label{chap:approach}
 
 To summarize, we want to solve the \gls{tsp}, and its dynamic version, using the \gls{hsppbo} algorithm. Furthermore, we want to detect dynamic changes that occur within the problem instances during runtime and react accordingly, to create a newly adapted solution as quickly as possible. And all this with the best available set of parameters. For this last crucial step we take a page from the field of machine learning, where optimizing a model's hyperparameters was already a research topic in the 1990s \cite{feurer2019hyperparameter}. Since then, \gls{hpo} has evolved into an important staple in that research community, being implement into almost every modern \gls{ml} training software and having multiple open-source standalone packages, written in most common programming languages, the most popular being \textit{Python}.
 It is precisely this knowledge of optimizing parameters for functions that are often expensive to execute - be it a nondeterministic algorithm or a complex artificial neural network - that we want to leverage for our problem.

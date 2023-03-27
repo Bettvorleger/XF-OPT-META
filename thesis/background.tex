@@ -6,8 +6,8 @@
 \label{chap:background}
 \glsresetall
 
-
 \section{Traveling Salesman Problem}
+\label{chap:tsp}
 
 \subsection{A Brief History}
 
@@ -17,7 +17,7 @@ With advances in computer science also came more computational applicable algori
 Applications for the solutions are numerous, from the apparent routing of travel routes to frequency assignment \cite{punnen2007traveling}.
 
 \subsection{Theory}
-
+\label{chap:tsp-theory}
 The problem description of the symmetric \gls{tsp}  can best be modeled by an undirected weighted graph $G = (V,E)$, with a set of $n$ vertices $V = \left\lbrace v_1, ... v_n\right\rbrace $ and a set of edges $E = \left\lbrace (v_i,v_j) | v_i,v_j \in V, i \neq j\right\rbrace $. Staying in the traveling salesperson analogy, the vertices are often being referred to as \enquote{cities}, while the edges between vertices represent the distance. This can be expressed by a distance function $d : V^2 \rightarrow \mathbb{R}_{0}^{+}$, which, in the case of Euclidean TSP, is just the Eucledian distance between two points in a two dimensional space.  Each city can only be visited once and since its symmetric, it does not matter which direction the abstract salesperson travels. The problem is to find the shortest (meaning smallest total distance) tour that visits each city exactly once, starting and ending at the same city. The solution resembles a permutation of $V$, written as $\textbf{s} = (s_1,...,s_n) \in V^n$, that minimizes the sum over its distances resulting in a solution quality function over $s$
 \begin{equation}
 	\label{eq:solution_quality}
@@ -87,11 +87,11 @@ One of the more common ones are based on...
 	\item ...which analogy they belong to:\\ Bio-Inspired vs. Physics-Based vs. Evolutionary  vs. Swarm-Based
 \end{itemize}
 
-Although all of these classifications are justified, I will not rely on any one of them, as it would serve no purpose to limit the discussion to one category. When necessary, algorithms will be placed within these taxonomies, to explain their purpose respectively.
+Although all of these classifications are justified, none of them will be used on its own, as it would serve no purpose to limit the discussion to one category. When necessary, algorithms are placed within these taxonomies, to explain their purpose respectively.
 
 \subsection{Overview}
 
-The first classification mentioned (Single-Solution Based vs. Population-Based) will be used to give a short overview of the field, because of the intuitive separation it creates. 
+The first classification mentioned (Single-Solution Based vs. Population-Based) is used to give a short overview of the field, because of the intuitive separation it creates. 
 
 \subsubsection{Single-Solution Based Metaheuristics}
 
@@ -187,7 +187,7 @@ In the following reinforcement phase different strategies can be applied to sele
 
 This loop is repeated until a termination criterion is met. This can be a fixed number of iterations $\text{NC}_{\text{MAX}}$ or until the solution quality stagnates for a certain period of iterations. With the pheromone update implemented as \enquote{ant-cycle} the time complexity of this algorithm is $O(\text{NC}\cdot n^2 \cdot m)$ \cite{dorigo1996ant}.
 
-Based on this algorithm, a large number of variants were created. One of them is a population-based approach, which will be discussed in the following.
+Based on this algorithm, a large number of variants were created. One of them is a population-based approach, which is discussed in the following.
 
 \subsubsection{Population-Based Ant Colony Optimization}
 The \gls{paco} was first proposed by \citet{guntsch2002population} as a simplification of the \gls{aco}, effectively reducing the operations necessary to update the pheromone information by quantifying and limiting the values added to the matrix. Their motivation was to speed up the process and decrease the influence of older solutions in order to apply the \gls{paco} to the \gls{dtsp}. 
@@ -341,6 +341,7 @@ After the populations are initialized with random solutions, each \gls{sce} crea
 Additionally, the influence of the \textit{SELECT+COPY} and \textit{RANDOM} operations of the population can be further controlled by the weights $w_p$ and $w_r$. Afterwards, the populations are updated based on a set of rules specific to the implementation. For example, in an \gls{sppbo} version with only one global best population, the update procedure may insert the iteration best solution, and saving a total of $k$ iterations \cite{lin2015simple}.
 
 \subsubsection{Hierarchical Simple Probabilistic Population-Based Optimization}
+\label{chap:hsppbo}
 
 Building on the schematic foundation of the \gls{sppbo}, the \gls{hsppbo} was designed using its principles. Combining the hierarchical aspect of \gls{hpso} with a probabilistic solution creating approach similar to \gls{sso}, while maintaining a population of solutions, like \gls{paco}, the goal of this algorithm, as stated by \citet{kupfer2021hierarchical}, was to not only solve the \gls{dtsp}, but also detect these dynamic changes to react accordingly. 
 
@@ -353,7 +354,7 @@ Similar to the descriptions regarding \gls{sppbo}, there is a set $\mathcal{A}$ 
 Each population contains exactly one solution vector $\mathbf{s} \in V^n$ (e.g., for a \gls{tsp} instance of size $n$) from the set of all feasible values $V$. Also, note that due to the tree structure $P^{A}_{\text{parentbest}} = P^{\text{parent}(A)}_{\text{persbest}}$. Each of these populations have a corresponding weight $w_{\text{persprev}}, w_{\text{persbest}}, w_{\text{parentbest}} \geq 0$ to control their respective influence. 
 Now, to create a solution $\mathbf{s}$ the probabilistic rule is very similar to the one used by \gls{sso} seen in Eq. \eqref{eq:sso_rule}, with $p_{\text{gbest}}$ referring to the parent's best solution and a distinct random influence $p_r$ through a random weight $w_\text{rand}$.
 
-The following description of the algorithm and equations are adapted to fit the \gls{tsp}, because the \gls{hsppbo} was initially created to solve the \gls{tsp} and its dynamic variant. A modification to solve other combinatorial problems, e.g., the \gls{qap}, would be straightforward, but will not be discussed in this thesis.
+The following description of the algorithm and equations are adapted to fit the \gls{tsp}, because the \gls{hsppbo} was initially created to solve the \gls{tsp} and its dynamic variant. A modification to solve other combinatorial problems, e.g., the \gls{qap}, would be straightforward, but is not discussed in this thesis.
 
 \begin{algorithm}
 	\caption{H-SPPBO}
@@ -395,6 +396,7 @@ Then, every iteration, each \gls{sce} creates one solution using the following p
 \end{equation*}
 with $\text{range}(A)$ giving all three populations assigned to the \gls{sce} as mentioned above, and a heuristic component $\eta_{ik}$ set as the inverse distance $1 / d_{ik}$ between nodes $i$ and $k$, which is typical for the \gls{tsp}. This $\tau$-term effectively accumulates all the different weights, by using $s_{ik}(P)$ as an activation function for checking, if the current, possible edge $(i,k)$ was also visited previously by the \gls{sce} ($P^{A}_{\text{persprev}}, P^{A}_{\text{persbest}}$) or its parent ($P^{A}_{\text{parentbest}}$), i.e., formally, if the ordered set $(i,k)$ is a subset of the solution vector $\mathbf{s}_P$ of population $P$. The following example is given for clarification:
 \begin{example}[A subset of an ordered set]
+	\label{ex:subset}
 Using the \gls{tsp} instance from Fig.\ref{fig:ExampleTSP}, a previous solution of a \gls{sce} might be $\mathbf{s}_\text{persprev} = (4,2,3,1) \in V^4$. Then, $(4,2)$ would be an ordered subset of that solution, $s_{4,2}(P_\text{persprev}) = 1$.
 \end{example}
 As with the \gls{aco} metaheuristic, $\alpha, \beta \geq 0$ are parameters to control the stochastic and heuristic influence respectively. 
@@ -403,7 +405,7 @@ The probability for visiting node $j$ after node $i$ can now be defined by
 	\label{eq:hsppbo_prob}
 	p_{ij}(A) = \frac{\tau_{ij}(A)}{\sum_{k \in U} \tau_{ik}(A)}
 \end{equation}
-where the denominator is used to normalize this term into a probability distribution over all unvisited nodes $U$. Finally, a node $j$ will randomly be drawn from that distribution, added to the solution vector $\mathbf{s}$ and removed from the unvisited set $U \gets {j}\setminus U$. With this new node being the next current node, the process is repeated until the set of unvisited nodes is exhausted. And eventually, the populations are updated.
+where the denominator is used to normalize this term into a probability distribution over all unvisited nodes $U$. Finally, a node $j$ is randomly drawn from that distribution, added to the solution vector $\mathbf{s}$ and removed from the unvisited set $U \gets {j}\setminus U$. With this new node being the next current node, the process is repeated until the set of unvisited nodes is exhausted. And eventually, the populations are updated.
 
 With new solutions calculated, the hierarchy is now subject to change. The \gls{sce} tree is iterated in a top-down, breadth-first manner ($\mathcal{A}_\text{tree}$) and every \gls{sce} compares its personal best solution with its parent by using an evaluation function $f : V^n \rightarrow \mathbb{R}_{0}^{+}$, which in case of the \gls{tsp}, is just the length of the tour $L$. If the child has a better solution quality than its parent, so $f(\mathbf{s}^A_{\text{persbest}}) < f(\mathbf{s}^{\text{parent($A$)}}_{\text{persbest}})$, they swap their places. Thus, making the $\text{range}$ function dynamically changing by also swapping the $P^{A}_{\text{parentbest}}$ population. An example of said swap operation is given in Fig. \ref{fig:ternary-tree}. By using this top-down approach, comparatively worse solutions can descend all the way to the bottom level in one iteration, while good solutions may only be able to move up one tier. Nevertheless, if no new personal best solutions have been found in at least as many iterations as the number of levels of the tree $h$, the global best solution is able to move to the root of the \gls{sce} tree.
 
@@ -472,7 +474,7 @@ Every metaheuristic has at least a few parameters to control its behavior. This 
 	\label{fig:paramtax}
 \end{figure}
 
-This thesis applies methods from machine learning research to address said challenge. Therefore, the following review of parameter optimization methods will classify this technique and identify other possible strategies. \Cref{fig:paramtax} shows a taxonomy of parameter optimization methods by \citet{eiben1999parameter}, with additions from \citet{talbi2009metaheuristics} and \citet{stutzle2012parameter}. Two main distinctions can be made here: \enquote{Parameter Tuning} (offline initialization) tries to find good parameter settings before the algorithm is even applied, and these settings remain fixed afterwards. \enquote{Parameter Control} (online initialization) modifies the parameters during algorithm runtime, allowing for potentially better adaptation to the problem.
+This thesis applies methods from machine learning research to address said challenge. Therefore, the following review of parameter optimization methods classifies this technique and identifies other possible strategies. \Cref{fig:paramtax} shows a taxonomy of parameter optimization methods by \citet{eiben1999parameter}, with additions from \citet{talbi2009metaheuristics} and \citet{stutzle2012parameter}. Two main distinctions can be made here: \enquote{Parameter Tuning} (offline initialization) tries to find good parameter settings before the algorithm is even applied, and these settings remain fixed afterwards. \enquote{Parameter Control} (online initialization) modifies the parameters during algorithm runtime, allowing for potentially better adaptation to the problem.
 
 \subsubsection{Parameter Control}
 
@@ -544,6 +546,7 @@ Nevertheless, it still serves as a well-performing baseline for many \gls{ml} be
 
 
 \subsection{Bayesian Optimization}
+\label{chap:bo}
 \gls{bo} is not only an algorithm used for \gls{hpo}, but a complete framework for the global optimization of (expensive) black-box functions. It differs from methods like the aforementioned \gls{rs} by incorporating prior knowledge about the objective function into the sampling procedure. 
 The prior, i.e., the analyzed objective function $f: \mathcal{\mathbf{\Lambda}} \to \mathbb{R}$, under assumption of the evident data it samples $\mathcal{D}_t = \left\lbrace (\mathbf{\lambda_i}, f(\mathbf{\lambda_i})) |  i\in [1,t] \right\rbrace $ yields a likelihood $P(\mathcal{D}_t|f)$, which can then be combined with the prior distribution $P(f)$ leading to the posterior distribution through application of Bayes' theorem:
 \begin{equation}
@@ -580,6 +583,7 @@ A common interpretation of this theory for effective implementations of \gls{bo}
 First, the acquisition function $u(\mathbf{\lambda}|\mathcal{D}_{t-1})$ uses the probability distribution of the surrogate and all previously sampled data points to assess the search space, in order to find the most beneficial next point to sample. High acquisition corresponds to potentially optimal objective function values. Through choosing widely unsampled parameter areas, the function realizes exploratory behavior, while further samples in already well performing areas employs exploitative strategies. The specific choice of acquisition function always defines a (customizable) trade-off between these two \cite{brochu2010tutorial}. 
 With the most promising parameter input $\mathbf{\lambda_t}$ of iteration $t$ specified, the (potentially) noisy objective function $f(\mathbf{\lambda_t}) + \epsilon_t$ gets sampled. The noise is often modeled as an independent Gaussian distribution with zero mean and variance $\sigma_n^2$
 \begin{equation}
+	\label{eq:gauss-noies}
 	\epsilon = \mathcal{N}(0,\sigma_n^2)
 \end{equation} 
 following the original proposition of \citet{williams2006gaussian}.
@@ -595,9 +599,10 @@ An example of the process can be seen in \cref{fig:bo-sample}, where the three f
 \end{figure}
 
 Different combinations of surrogate model and acquisition function are possible in realizing a \gls{bo} algorithm. The relatively fast convergence to near-global optima makes this versatile algorithm a viable choice for \gls{hpo}, heavily improving on model-free methods. However, the sequential reliance on previously sampled data makes parallelization difficult \cite{yang2020hyperparameter}.
-The following subsections will briefly explain some popular acquisition functions and then discuss three surrogate models in more detail.
+The following subsections briefly explains some popular acquisition functions and then discusses three surrogate models in more detail.
 
 \subsubsection{Acquisition Functions}
+\label{chap:bo-acq}
 
 As mentioned before, an acquisition function guides the sampling process while balancing exploration and exploitation. Given the distribution of the surrogate model, including its predictive mean $\mu(\mathbf{\lambda})$, and its variance function $\sigma(\mathbf{\lambda})$, and the previously sampled data $\mathcal{D}$, with $f_{min} = \operatorname*{argmin}_{\mathbf{\lambda}\in \mathcal{D}} f(\mathbf{\lambda})$ denoting the best observed value so far, the acquisition function is defined as $u: \mathbf{\Lambda} \to \mathbb{R}^+$ \cite{snoek2012practical}. Two common choices for that function are the \gls{pi} and the \gls{ei}.
 

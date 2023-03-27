@@ -218,7 +218,7 @@ class TSP(Problem):
         There are two definitions for the QDC:
         1. (Q3-Q1)/(Q3+Q1)
         2. (Q3-Q1)/Q2
-        Version 2 is implemented
+        Version 1 is implemented
 
         Returns:
             tuple[float, float]: quartile coefficient of dispersion of distances between nodes

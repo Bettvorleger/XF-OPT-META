@@ -37,6 +37,9 @@ class Analyzer:
         self.obj_algorithm = obj_algorithm
         self.output_path = output_path
 
+        if self.output_path:
+            Path(self.output_path).mkdir(parents=True, exist_ok=True)
+
     def create_results(self) -> None:
         results = {}
         if self.mode == self.MODE_RUN:
@@ -299,7 +302,7 @@ class Analyzer:
             folder = paths_dict
             opt_solution = get_optimal_solution(folder['info.json'])
             info = get_info(folder['info.json'])
-            opt = info['optimizer']
+            opt = get_optimizer_type(folder['info.json'])
             problems.add(info['problem']['name'])
             return (opt, load_opt_result(folder, pickled=False))
 
@@ -722,7 +725,17 @@ def get_optimizer_type(path: str) -> str:
     with open(path, 'r') as f:
         info = json.load(f)
         f.close()
-    return info['optimizer']
+    match info['optimizer']:
+        case 'random':
+            return 'RS'
+        case 'bayesian':
+            return 'GP'
+        case 'forest':
+            return 'ET'
+        case 'gradient':
+            return 'GBRT'
+        case _:
+            return info['optimizer']
 
 
 def get_info(path: str) -> str:
