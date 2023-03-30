@@ -258,7 +258,7 @@
 
 % EN: Defintion of colors. Argument "hyperref" is not used as we do not want to change border colors of links: Links are not colored anymore.
 % DE: Farbdefinitionen
-\usepackage[dvipsnames]{xcolor}
+\usepackage[dvipsnames,table]{xcolor}
 
 
 % EN: Required for custom acronyms/glossaries style.
@@ -429,10 +429,10 @@
 % EN: Enable typesetting values with SI units.
 \ifdeutsch
   \usepackage[mode=text,group-minimum-digits=4]{siunitx}
-  \sisetup{locale=DE}
+  \sisetup{locale=DE,round-precision=3}
 \else
   \usepackage[mode=text,group-minimum-digits=4,group-separator={,}]{siunitx}
-  \sisetup{locale=US}
+  \sisetup{locale=US,round-mode=places,round-precision=3}
 \fi
 
 
