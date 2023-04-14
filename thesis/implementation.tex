@@ -9,6 +9,8 @@
 \glsreset{hpo}
 \glsreset{bo}
 
+\epigraph{A tool that does everything is optimized for nothing.}
+
 \section{Modules}
 \label{chap:modules}
 
@@ -178,7 +180,7 @@ Primarily, this mode is used to quickly test parameter configurations, new probl
 
 The optimizer mode realizes the \glsdesc{hpo} workflow using \glsdesc{bo}. Unlike the run mode, we do not need to explicitly provide any parameters for the metaheuristic. Instead, we provide a parameter configuration space $\mathbf{\Lambda}$ that specifies, for each parameter $\lambda_i$ of the \texttt{hsppbo} module (see \cref{chap:hsppbo-module}), which range or categorical values are allowed during the optimization run. For example, the value controlling the stochastic influence $\alpha$ may be any natural number (integer) between 0 and 10. Note that it is possible to set a parameter to a fixed value instead, effectively excluding it from the optimization process. Another new input to this mode is the number of consecutive runs $r_{\text{opt}}$ and the number of calls to the objective function \texttt{n\_calls} for each of these runs (see \cref{chap:optimizer}).
 
-\Cref{alg:xf-opt} shows the complete workflow of this mode. An impotent step after all the modules have been initialized is to set the random seed for the \texttt{hsppbo} and \texttt{problem} modules. As explained before, this allows for reproducible results. The random seed for the \texttt{optimizer} is set to be equal to the run counter. This way, each optimizer run gets a new randomly-initialized surrogate model with different results, but also ensures that these results are obtained repeatedly. Next, a special execution wrapper is created that acts as a mapping function $f: \mathcal{\mathbf{\Lambda}} \to \mathbb{R}$, giving each parameter configuration a score that the optimizer can decide on. Furthermore, the \texttt{logger} module is especially important in this mode, since the \texttt{optimizer} returns a variety of information and objects that are useful for later analysis. Each run aggregates the optimal parameters into a set $\mathcal{C}$, to easily view the resulting best configuration. 
+\Cref{alg:xf-opt} shows the complete workflow of this mode. An impotent step after all the modules have been initialized is to set the random seed for the \texttt{hsppbo} and \texttt{problem} modules. As explained before, this allows for reproducible results. The random seed for the \texttt{optimizer} is set to be equal to the run counter. This way, each optimizer run gets a new randomly-initialized surrogate model with different results, but also ensures that these results are obtained repeatedly. Next, a special execution wrapper is created that acts as a mapping function $f: \mathcal{\mathbf{\Lambda}} \to \mathbb{R}$, giving each parameter configuration a score that the optimizer can decide on. Furthermore, the \texttt{logger} module is especially important in this mode, since the \texttt{optimizer} returns a variety of information and objects that are useful for later analysis. Each run aggregates the optimal parameters into a set $\mathcal{C}$, to easily view the resulting best configuration. \Cref{fig:optimizer-flow} also illustrates this workflow.
 
 \begin{algorithm}
 	\caption{XF-OPT/HSPPBO: Optimizer Mode}
@@ -204,6 +206,13 @@ The optimizer mode realizes the \glsdesc{hpo} workflow using \glsdesc{bo}. Unlik
 		\State \Return $\mathcal{C}$
 	\end{algorithmic}
 \end{algorithm}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.8\textwidth]{optimizer_flow.svg}
+	\caption{Visualization of the optimizer mode workflow.}
+	\label{fig:optimizer-flow}
+\end{figure}
 
 \subsection{Experimentation Mode}
 \label{chap:exp-mode}

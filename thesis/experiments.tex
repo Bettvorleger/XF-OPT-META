@@ -7,6 +7,7 @@
 \label{chap:experiment}
 
 \section{Choice of Problem Instances}
+\label{chap:problem-choice}
 
 This thesis builds on the foundation of the \glsfirst{hsppbo} work of \cite{kupfer2021hierarchical}. Therefore, the problem category was chosen analogously to the symmetric \glsfirst{tsp}. In this way, we can refer to previous work, while also generalizing many different, relevant problems (see \cref{chap:tsp}). 
 The \gls{tsp} instance test cases were taken from the popular \textit{TSPLIB} benchmarking suite \cite{reinelt1991tsplib}, since they have been tried and tested in many publications and also have the advantage that the optimal solution is known for each of the problems, which enables further comparison with other metaheuristics. Besides the standard 2D Euclidean weights, there are also instances of geographic distance problems or distance matrices. The thesis focuses on 2D Euclidean instances for simplicity, but the software itself can handle most types of TSP edge weights (see \cref{chap:tsp-module}).
@@ -115,8 +116,8 @@ The \textit{k-means++} algorithm was applied to all of the 118 instances, with t
  
  \begin{enumerate}
  	\item Random to nearly regular distribution: $R > 0.9$
- 	\item Artificially structured with certain patterns of medium clustered regions, with small distinct holes within the distribution: $R \in [0.55, 0.9]$ and $\lambda_1 > 500 000$
  	\item Smaller, slightly clustered areas with otherwise random structure: $R \in [0.55, 0.9]$ and $\lambda_1 < 500 000$
+ 	\item Artificially structured with certain patterns of medium clustered regions, with small distinct holes within the distribution: $R \in [0.55, 0.9]$ and $\lambda_1 > 500 000$
  	\item A few highly clustered areas: $\lambda_1 > 1 700 000$
  	\item Dispersed and highly clustered areas with few or no city nodes in between: $R < 0.6$ and $CQV > 0.5$ \end{enumerate}
 
@@ -270,7 +271,7 @@ To conclude, the final parameter ranges are as follows:
 	\item $w_{\text{persprev}}, w_{\text{persbest}}, w_{\text{parentbest}} \in [0.001,0.99]$
 	\item $\alpha, \beta \in \left\lbrace x\in\mathbb{N} | 0 \leq x \leq 10 \right\rbrace$
 	\item $\theta \in [0.1,0.5]$
-	\item $H = \left\lbrace H_{\text{full}}, H_{\text{partial}}, \emptyset \right\rbrace$ (categorical)
+	\item $H = \left\lbrace H_{\text{full}}, H_{\text{partial}} \right\rbrace$
 	\item $L = 5$ (not optimized)
 	
 \end{itemize}
@@ -372,7 +373,12 @@ All of these tests were conducted using the implementation explained in \cref{ch
 
 Each of the three data sets was analyzed differently, depending on the objective. These objectives and the methods used to achieve them are explained in the following. The functionality is encompassed by a separate \texttt{analyzer} module and accompanying \textit{Python} scripts, both of which are not explained in detail in this thesis, but are also part of \textit{\gls{xfopt}} and available in the GitHub repository. 
 
-In general, since we have used \gls{tsp} instances from the \textit{TSPLIB}, we know the optimal solution for each of these instances $L^*$. Therefore, when referring to the solution quality $f(\mathbf{\lambda}) = L$ of a parameter set $\mathbf{\lambda}$, instead of giving the actual length of the \gls{tsp} tour $L$, a relative difference to the optimal solution $RPD = (L - L^*) / L^*$ was used. This makes it easier to evaluate solutions and to compare different problem instances with varying optimal solution.
+In general, since we have used \gls{tsp} instances from the \textit{TSPLIB}, we know the optimal solution for each of these instances $L^*$. Therefore, when referring to the solution quality $f(\mathbf{\lambda}) = L$ of a parameter set $\mathbf{\lambda}$, instead of giving the actual length of the \gls{tsp} tour $L$, a relative difference to the optimal solution $RPD$ was used, which is defined as follows:
+\begin{equation}
+	\label{eq:rpd}
+	RPD = (L - L^*) / L^*
+\end{equation}
+This makes it easier to evaluate solutions and to compare different problem instances with varying optimal solution.
 
 Furthermore, continuing the explanation of the first two parts of the experiment and their data sets $\mathcal{D}(\mathcal{A},p,C,r_\text{opt}) \to \left\lbrace \mathcal{H}(\mathbf{\lambda}, f(\mathbf{\lambda})), \mathbf{\lambda^*}, \mathcal{M} \right\rbrace$, the $RPD$ value has been applied to all of the solution qualities of the parameter histories $\mathcal{H}(\mathbf{\lambda}, f(\mathbf{\lambda}))$.
 To help illustrate further explanations, an excerpt of such a parameter run history is shown in \cref{tab:part1-2-history}.
@@ -392,6 +398,7 @@ To help illustrate further explanations, an excerpt of such a parameter run hist
 \end{table}
 
 \subsection{Part I - Choosing the Optimization Algorithm}
+\label{chap:an-part1}
 The first part focuses on the ideal \gls{hpo} method to use. Therefore, the convergence behavior, the resulting solution quality, and the robustness in finding a good solution are subject of this part. For this purpose, a convergence plot was created for each of the five problem instances containing all four optimization methods. This line graph shows the best/minimum current solution quality (y-axis) obtained until each further iteration of objective call (x-axis), one line for each of the three optimization runs, differentiating the four optimization algorithms by color. An additional bold line shows the mean progression averaged along the objective call axis for each algorithm. \Cref{eq:convergence-plot,eq:convergence-plot-mean} define the formulation for the pairs $\left\lbrace (x,y) \, | 10 < x \leq \texttt{n\_calls} \right\rbrace $, where $f(\mathbf{\lambda})_i$ is the solution quality for the parameters acquired during the $i$-th optimizer iteration of all \texttt{n\_calls}.
 \begin{equation}
 	\label{eq:convergence-plot}
@@ -410,6 +417,7 @@ Both tests are explained in more detail in the next two subsections.
 All of the evaluations mentioned above start after iteration 10, because these first iterations are randomly sampled and do not reflect the model/algorithm behavior.
 
 \subsubsection{Kruskal–Wallis H Test}
+\label{chap:kruskal}
 This statistical method is used to determine whether multiple samples come from the same underlying distribution. Given a number of $N$ total observations divided into $k$ samples of possibly different sizes $n_i$ ($1 \leq i \leq k$), the null hypothesis $H_0$ can be formulated, that \enquote{all of the $k$ population distribution functions are identical} \cite{conover1999practical} and the alternative $H_1$ under rejection of $H_0$ at significance level 0.05 is, that at least one distribution differs considerably from the others. In our case, we want to test, if one particular parameter search behavior of the optimization methods performs significantly different from the others. Due to the interlaced sampling procedure of \gls{hpo}, the test assumption of completely random acquired samples can only be partially ensured here. The test statistic $T$ is defined as follows:
 \begin{equation}
 	T = \frac{1}{S^2} \left(  \sum_{i=1}^{k} \frac{R_i^2}{n_i} - \frac{N(N+1)^2}{4}  \right) 
@@ -420,6 +428,7 @@ This statistical method is used to determine whether multiple samples come from 
 where $X_{ij}$ denotes the $j$-th entry from the $i$-th sample of all $k$ samples, and $R(\cdot)$ a rank function, mapping an integer value between $\left[ 1,N\right] $ to all ordered samples ignoring the sample groups from smallest ($R = 1$) to largest ($R = N$) sample value. Lastly, let $R_i$ be the sum of all ranks for the $i$-th sample. The significance ($p$-value) can then be acquired through a table or through a software package. The thesis is using the \textit{SciPy} implementation of the Kruskal–Wallis Test, which approximates its $p$-value through a $\chi^2$ distribution.
 
 \subsubsection{Conover–Iman Test}
+\label{chap:conover}
 \citet{conover1979multiple} proposed a squared ranks test for comparing the variances of multiple samples. Except for allowing the means of the distributions to differ, the Conover-Iman test uses a $H_0$ hypothesis similar to the Kruskal–Wallis test, that all $k$ populations are identically distributed. If $H_0$ could be rejected for a particular paring of samples $X$ and $Y$, the statement of the alternative hypothesis $H_1$ depends on the focus of the test: A two-tailed test asserts, that the variances of the two samples are not equal ($Var(X) \neq Var(Y)$), where a lower- or upper-tailed test claims that one of the sample's variance is smaller/larger than the other one ($Var(X) \lessgtr Var(Y)$).
 Before the test statistic can be calculated, the samples $X_{ij}$ are normalized by subtracting the population mean from each observation ($Z_{ij} = |X_{ij} - \overline{X}_i|$) and then the rank $R_{ij}$ is calculated as explained with the Kruskal–Wallis test. The statistical value $T$ can now be defined as follows \cite[Chapter~5.3]{conover1999practical}:
 \begin{equation}

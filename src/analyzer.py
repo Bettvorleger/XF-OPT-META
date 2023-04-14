@@ -189,37 +189,45 @@ class Analyzer:
                 res['cmp'] = key
                 results = pd.concat(
                     [results, res], ignore_index=True, sort=False)
-
+        print(results)
         y1 = ["alpha", "beta"]
         y2 = ['w_pers_best', 'w_pers_prev', 'w_parent_best']
         if 'detection_threshold' in results.columns:
             y2.append('detection_threshold')
 
-        fig = make_subplots(shared_yaxes=True,
-                            rows=2, cols=1, vertical_spacing=0.1)
+        fig = make_subplots(rows=2, cols=1, vertical_spacing=0.1)
         fig1 = px.box(results, y=y1,
-                      color="cmp" if cmp else None, points="all", category_orders={"cmp": sorted(res['cmp'].unique())})
+                      color="cmp" if cmp else None)
         fig2 = px.box(
-            results, y=y2, color="cmp" if cmp else None, points="all", category_orders={"cmp": sorted(res['cmp'].unique())})
+            results, y=y2, color="cmp" if cmp else None)
 
         for f in fig1['data']:
             fig.add_trace(go.Box(f, showlegend=False,
-                          legendgroup='group'), row=1, col=1)
+                          legendgroup='group', boxpoints=None if cmp else 'all'), row=1, col=1)
         for f in fig2['data']:
-            fig.add_trace(go.Box(f, legendgroup='group'), row=2, col=1)
+            fig.add_trace(go.Box(f, showlegend=True if cmp else False,
+                          legendgroup='group', boxpoints=None if cmp else 'all'), row=2, col=1)
 
-        fig.update_layout(legend_title_text=cmp, boxmode='group')
+        fig.update_layout(legend_title_text=cmp,
+                          boxmode='group' if cmp else None)
+        fig.update_layout(boxgroupgap=0.2, boxgap=0.2)
         fig.update_layout(
             title={
-                'text': 'Boxplot of best parameter sets (%s comparison over runs {%s})' %
-                (cmp, ",".join(str(x) for x in result_nums)),
+                'text': 'Boxplot of best parameter sets (%s comparison over runs [%d,%d])' %
+                (cmp, result_nums[0], result_nums[-1]),
                 'y': 0.95,
                 'x': 0.5,
                 'xanchor': 'center',
                 'yanchor': 'top'}
         )
 
-        fig.show()
+        if self.output_path:
+            fig.update_layout(title=None,margin=dict(l=0, r=0, t=0, b=0))
+            fig.write_image("/".join([self.output_path, 'param_boxplot_%s_runs_%d_to_%d.svg' %
+                                      (cmp, result_nums[0], result_nums[-1])]),
+                            format="svg", width=650, height=425)
+        else:
+            fig.show()
 
     def create_param_scatter_matrix(self, result_nums: list[int], cmp='optimizer', paths_dict=None):
         """
@@ -283,7 +291,14 @@ class Analyzer:
                 'xanchor': 'center',
                 'yanchor': 'top'}
         )
-        fig.show()
+        
+        if self.output_path:
+            fig.update_layout(title=None,margin=dict(l=0, r=0, t=0, b=0))
+            fig.write_image("/".join([self.output_path, 'param_scatter_matrix_%s_runs_%d_to_%d.svg' %
+                                      (cmp, result_nums[0], result_nums[-1])]),
+                            format="svg", width=950, height=650)
+        else:
+          fig.show()  
 
     def create_convergence_plot(self, result_nums: list[int], paths_dict=None):
         """
@@ -561,19 +576,27 @@ class Analyzer:
             func_results.setdefault(opt, []).extend(
                 [(r.fun-opt_solution)/opt_solution for r in res])
 
-        fig = make_subplots(shared_xaxes=True,
-                            rows=2, cols=1, vertical_spacing=0.05,
-                            subplot_titles=("Relative difference to optimal solution quality<br>of all minimal function values ", "AUC of solution quality convergence graph"))
-        fig1 = px.box(pd.DataFrame(func_results))
-        fig2 = px.box(pd.DataFrame(auc_results))
-        fig.add_trace(go.Box(fig1['data'][0]), row=1, col=1)
-        fig.add_trace(go.Box(fig2['data'][0]), row=2, col=1)
-        fig.update_layout(margin={'l': 10, 'r': 10, 't': 45, 'b': 10})
-        fig.update_annotations(font_size=14)
         if self.output_path:
-            fig.write_image("/".join([self.output_path, 'convergence_stats_boxplot.png']),
-                            format="png", width=400, height=750, scale=2)
+            fig = make_subplots(shared_xaxes=True,
+                                rows=1, cols=2, vertical_spacing=0.05, horizontal_spacing=0.05)
+            fig1 = px.box(pd.DataFrame(func_results))
+            fig2 = px.box(pd.DataFrame(auc_results))
+            fig.add_trace(go.Box(fig1['data'][0]), row=1, col=1)
+            fig.add_trace(go.Box(fig2['data'][0]), row=1, col=2)
+            fig.update_layout(margin={'l': 0, 'r': 0, 't': 0, 'b': 0})
+            fig.update_annotations(font_size=15)
+            fig.write_image("/".join([self.output_path, 'convergence_stats_boxplot.svg']),
+                                format="svg", width=650, height=250)
         else:
+            fig = make_subplots(shared_xaxes=True,
+                                rows=2, cols=1, vertical_spacing=0.05,
+                                subplot_titles=("Relative difference to optimal solution quality<br>of all minimal function values ", "AUC of solution quality convergence graph"))
+            fig1 = px.box(pd.DataFrame(func_results))
+            fig2 = px.box(pd.DataFrame(auc_results))
+            fig.add_trace(go.Box(fig1['data'][0]), row=1, col=1)
+            fig.add_trace(go.Box(fig2['data'][0]), row=2, col=1)
+            fig.update_layout(margin={'l': 10, 'r': 10, 't': 45, 'b': 10})
+            fig.update_annotations(font_size=14)
             fig.show()
 
     def load_result_folder(self, result_num: int) -> Path:
@@ -609,7 +632,6 @@ class Analyzer:
         info = get_info(folder['info.json'])
         best_params = params.iloc[params['func_val'].idxmin()]
         return (info['problem']['name'], info['problem']['dynamic_props']['dynamic_intensity'], best_params.to_dict())
-
 
     def create_file_wrapper(self, result_num: int, filename: str, mode='a') -> None:
         """
