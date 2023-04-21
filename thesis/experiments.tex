@@ -215,7 +215,7 @@ All of these models were used in the experiments, with the exception of the stan
 
 \subsection{Optimizer Initialization}
 \label{chap:opt-init}
-The initialization process can have a large effect on the outcome of the \gls{hpo} process. For all methods, a set of 10 starting points has been sampled using a specified method before the acquisition function was utilized for sampling. The \gls{rs} algorithm has only this sampling method for initialization. Besides the default uniform random number generator, there are several low-discrepancy sequences, such as the Hammersely sequence, and a Latin hypercube sampling method to choose from. Since we want to use \gls{rs} as a baseline in later discussion, the default uniform sampling was used.
+The initialization process can have a large effect on the outcome of the \gls{hpo} process. For all methods, a set of 10 starting points ($\mathcal{D}_\text{init}$) has been sampled using a specified method before the acquisition function was utilized for sampling, which is the default value for the library. The \gls{rs} algorithm has only this sampling method as a possible initialization metric. Besides the default uniform random number generator, there are several low-discrepancy sequences, such as the Hammersely sequence, and a Latin hypercube sampling method to choose from. Since we want to use \gls{rs} as a baseline in later discussion, the default uniform sampling was used.
 
 As mentioned above, the work of \citet{yin2021bayesian} was a useful starting point for the \gls{gp} surrogate model. They tried out different initializations for the \gls{bo}, including all three acquisition functions (\gls{pi}, \gls{ei}, \gls{lcb}), initial sampling methods, noise functions and values for improvement $\xi$. After reviewing their results, the most appropriate values were used to initialize the \gls{gp} model used in the thesis. The acquisition function was selected as \glsfirst{pi} with an improvement rate of $\xi = 0.01$, because it shows fast convergence behavior with good results. The kernel function was selected as a Matérn kernel with $\upsilon=5/2$, which is the default of the \texttt{scikit-optimize} library. It also uses an additive white noise kernel to account for a noisy objective function. However, instead of the default Gaussian noise scaled by the variance during the optimization process (see \cref{eq:gauss-noies}), a white noise kernel with a constant variance of 0.7 was chosen, to prevent bad search areas from gaining too much relevance for sampling \cite{yin2021bayesian}.
 Furthermore, a low-discrepancy Hammersely sequence was chosen over the default uniform distribution for initial sampling, as the \gls{gs} model appears to benefit from more evenly spaced out points \cite{cervellera2013learning}. 
@@ -227,7 +227,7 @@ No evidence was found to apply this reasoning to the other two models, \gls{et} 
 	 \caption[The \gls{hpo} methods used and their initialization values]{The \gls{hpo} methods used and their initialization values.}
 	\label{tab:opt-init}
 	\begin{tabular}{c|c|c|c}
-		Estimator & Acquisition Function & Sampling Method & Number of initial points \\
+		Estimator & Acquisition Function & Sampling Method & Number of initial points $\mathcal{D}_\text{init}$ \\
 		\hline
 		\gls{rs} & - & Uniform & -\\
 		\gls{bo}-\gls{gp} & \gls{pi} ($\xi=0.01$) & Hammersley & 10 \\
@@ -239,6 +239,7 @@ No evidence was found to apply this reasoning to the other two models, \gls{et} 
 As explained in \cref{chap:opt-mode}, the random seed of each method was set according to the current iteration of the optimization run. This ensures new samples and results for each optimization run, while also providing reproducibility.
 
 \section{Choice of Parameters and Value Ranges}
+\label{chap:choice-param}
 
 Since the focus of this thesis is on finding ideal parameter combinations using \gls{ml}-based \glsdesc{hpo} algorithms, we do not need to specify exactly which parameter values we want to test, as many other metaheuristics work does prior to experimentation. However, we still need to specify which of the available parameters of the \gls{hsppbo} algorithm we want to optimize automatically, if so, what range these parameters are sampled from during the process, and if not, what static parameter value we should assign and why.
 
@@ -250,7 +251,7 @@ As already explained in \cref{chap:hsppbo-module}, the following are all the ava
 	\item $\alpha, \beta \geq 0$ (integer)
 	\item $\theta \in [0,1]$ (real)
 	\item $H = \left\lbrace H_{\text{full}}, H_{\text{partial}}, \emptyset \right\rbrace$ (categorical)
-	\item $0 < L < 100$ (integer)
+	\item $0 < L_\text{pause} < 100$ (integer)
 \end{itemize}
 
 Unfortunately, these standard data ranges were too broad to calculate in time for this thesis. Therefore, parameter influences, effects, and existing justifications for limitations were investigated.
@@ -258,7 +259,7 @@ The parameters $H$ and $\theta$ are closely related to the hierarchical part of 
 
 The detection rate $\theta$ seems to benefit from values higher than 0.1, and gets mixed results from values between 0.25 and 0.5, depending strongly on the problem instance and its dynamic intensity $C$ \cite{kupfer2021hierarchical}. Since values higher than 0.5 would render the need for a change handling procedure obsolete because the changes would most certainly be undetected, a range of $\theta \in [0.1, 0.5]$ was tested. 
 
-The $L$ parameter is also related to this particular implementation of the algorithm's dynamic handling. Since its only purpose is to disable detection right after each change interval by the \gls{dtsp} instance, it only needs to be high enough to account for the rearrangement of the \gls{sce} tree. And since it introduces the risk of unfair prior knowledge of the change interval, it should be as small as possible, since a value equal to the dynamic period $T_{d}$ would make it impossible for the algorithm to falsely detect a change. Considering the theoretical \enquote{worst case} behavior of a complete reorganization on all three levels of the ternary tree with $13$ \glspl{sce}, a value of $L = 5$, also used in \cite{kupfer2021hierarchical}, is very reasonable.
+The $L_\text{pause}$ parameter is also related to this particular implementation of the algorithm's dynamic handling. Since its only purpose is to disable detection right after each change interval by the \gls{dtsp} instance, it only needs to be high enough to account for the rearrangement of the \gls{sce} tree. And since it introduces the risk of unfair prior knowledge of the change interval, it should be as small as possible, since a value equal to the dynamic period $T_{d}$ would make it impossible for the algorithm to falsely detect a change. Considering the theoretical \enquote{worst case} behavior of a complete reorganization on all three levels of the ternary tree with $13$ \glspl{sce}, a value of $L = 5$, also used in \cite{kupfer2021hierarchical}, is very reasonable.
 
 The values for $\alpha$ and $\beta$ are used in almost every \gls{aco} variant and many metaheuristics in general. Since the work of \cite{dorigo1996ant}, most papers on \gls{aco} variants use $\alpha$ and $\beta$ values between 0 and 5, often following the recommendation by Dorigo ($\alpha = 1, \beta = 5$). However, this only really applies to these \gls{aco} versions used on symmetric \gls{tsp} instances, while the \gls{hsppbo} algorithm combined with \gls{dtsp} instances behaves very differently. In addition, works such as \cite{stutzle2012parameter, tuani2018h, wong2008parameter} imply that good parameter combinations may differ greatly from the original recommendation depending on the problem type and algorithm, and have success using values of 10 or higher. Since $\alpha$ and $\beta$ are exponents, and the expression in which they are used (see \cref{eq:hsppbo_tau}) is normalized to a probability anyway, the values should be considered relative to each other rather than absolute. Therefore, they should be at least $10\%$ apart to cover any reasonable combination of the two. Larger value ranges would carry the risk of reducing the other parameter to a value where it loses its significance and is effectively deactivated, while this should be preferably achieved by choosing a value of 0. It could also be argued that, based on this logic, a real value chosen from $[0,1]$ would also result in similar expressiveness. However, natural numbers are most often used for these parameters, and make for a much easier comparison. This resulted in a range of $\alpha,\beta \in [0,10]$, with $\alpha,\beta \in \mathbb{N}$.
 
@@ -272,7 +273,7 @@ To conclude, the final parameter ranges are as follows:
 	\item $\alpha, \beta \in \left\lbrace x\in\mathbb{N} | 0 \leq x \leq 10 \right\rbrace$
 	\item $\theta \in [0.1,0.5]$
 	\item $H = \left\lbrace H_{\text{full}}, H_{\text{partial}} \right\rbrace$
-	\item $L = 5$ (not optimized)
+	\item $L_\text{pause} = 5$ (not optimized)
 	
 \end{itemize}
 
@@ -288,13 +289,14 @@ Each of the 10 problem instances mentioned above was used, with a varying dynami
 	\label{tab:exp-setup}
 	\centering
 	\begin{adjustbox}{width=1\textwidth}
-	\begin{tabular}{c|c|c|c|c|c|c}
+	\begin{tabular}{c c c c c c c}
+		\hline
 		\thead{Mode of\\Operation} & \thead{HPO Method} $\mathcal{A}$ & \thead{n\_calls} & \thead{runs\\ ($r_\text{opt}$/$r_\text{exp}$)} & \thead{Dynamic Intensity $C$} & \thead{Number of\\Instances} & \thead{\gls{hsppbo}\\Executions} \\
 		\hline
 		optimizer & \makecell{\gls{rs}, \gls{gp},\\ \gls{et}, \gls{gbrt}} & 30 & 3 & 0.25 & 5 (small) & 1800 \\
 
 		optimizer & \gls{gbrt} & 60 & 6 & all & 5 (small) & 5400 \\
-		experimentation & - & - & 20 & all & 10  & 2 x 600 \\
+		experimentation & - & - & 20 & all & 10  & 2 x 600 \\ \hline
 	\end{tabular}
 \end{adjustbox}
 \end{table}
@@ -351,7 +353,7 @@ The resulting data sets $\mathcal{D}$ of these first two experimentation parts c
 
 After this second part, we had 15 sets of optimal parameters, one for each combination of problem category (five groups as explained in \cref{chap:classification}) and dynamic intensity ($C \in \left\lbrace 0.1,0.25,0.5\right\rbrace$). Although the urge to aggregate these parameter configurations in some way (e.g., an average over all three dynamic intensities for each problem category) is tempting, because it would not only simplify the next part, but also provide a multipurpose parameter recommendation, it was omitted for several reasons. First, it introduces a whole new perspective to this work, namely how parameters can be generalized across different problem descriptions. However, the goal of this work, as explained in the \nameref{chap:approach}, is to directly apply \glsdesc{hpo} to metaheuristics and validate it as a viable option. Any generalization would compromise this goal and open up the research question to several new variables. Second, by looking at the results of the second part of the experiment, it was clear early on that there were huge differences between the optimization runs and each of their optimal parameter sets. Except perhaps for $\alpha$ and $\beta$, any aggregation of parameters would have been a mostly arbitrary choice, with a few exceptions. This circumstance is discussed further in \cref{chap:part2}.
 
-The third and final part verifies the previously selected \enquote{optimal} parameter selection. These 15 parameter sets were tested on their respective problem instances and dynamic intensities, with 20 experimental runs $r_\text{exp}$ each using the experimentation mode (see \cref{chap:exp-mode}). This time, all 10 instances were used. Since the problem classification effort was also made to obtain coherent instance groups, these parameter sets acquired using the smaller instances were also applied to the larger instances of each group. This results in 600 runs of the \gls{hsppbo} algorithm.
+The third and final part verifies the previously selected \enquote{optimal} parameter selection. These 15 parameter sets were tested on their respective problem instances and dynamic intensities, with 20 experimental runs $r_\text{exp}$ each using the experimentation mode (see \cref{chap:exp-mode}). This time, all 10 instances were used. Since the problem classification effort was also made to obtain coherent instance groups, these parameter sets acquired using the smaller instances were also applied to the larger instances of each group. Therefore, each of these 15 parameter sets is used two times, for a total of 30 different combinations of problem instance and dynamic. This results in 600 runs of the \gls{hsppbo} algorithm.
 As a reference for how well these \gls{hpo} parameter configurations perform, a general purpose parameter set (see \cref{tab:part3-gen-params}) was also applied to all 10 instances with all three dynamic intensities, again repeating each experimental run 20 times, yielding another 600 \gls{hsppbo} algorithm executions.
 The values for $\alpha, \beta, w_{\text{persprev}}, w_{\text{persbest}}, \text{and} \, w_{\text{parentbest}}$ were taken directly from the original work by \citet{kupfer2021hierarchical}, while the choice of $\theta$ and $H$ was influenced by how well a particular value performed in their results.
 \begin{table}
@@ -359,10 +361,11 @@ The values for $\alpha, \beta, w_{\text{persprev}}, w_{\text{persbest}}, \text{a
 	\caption{The values of the general purpose parameter set used as a reference in the third part of the experimentation.}
 	\label{tab:part3-gen-params}
 	
-	\begin{tabular}{c|c|c|c|c|c|c}
+	\begin{tabular}{c c c c c c c}
+		\hline
 		$\alpha$ & $\beta$ & $w_{\text{persprev}}$ & $w_{\text{persbest}}$& $w_{\text{parentbest}}$ & $\theta$ & $H$ \\
 		\hline
-		1 & 5 & 0.075 & 0.075 & 0.01 & 0.25 & partial \\
+		1 & 5 & 0.075 & 0.075 & 0.01 & 0.25 & partial \\ \hline
 	\end{tabular}
 \end{table}
 
@@ -387,13 +390,14 @@ To help illustrate further explanations, an excerpt of such a parameter run hist
 	\centering
 	\caption[An excerpt of the optimizer run parameter history]{An excerpt of the optimizer run parameter history $\mathcal{H}(\mathbf{\lambda}, f(\mathbf{\lambda}))$ for $D\left( A=\text{GP}, p=\text{eil51}, C=0.25, r_\text{opt} = 1\right) $, with an optimal solution of $L^*_\text{eil51}=426$.}
 	\label{tab:part1-2-history}
-	\begin{tabular}{c|c|c|c|c|c|c|c|c|c}
+	\begin{tabular}{c c c c c c c c c c}
+		\hline
 		\texttt{n\_call} & $\alpha$ & $\beta$ & $w_{\text{persbest}}$ & $w_{\text{persprev}}$& $w_{\text{parentbest}}$ & $\theta$ & $H$ & $f(\mathbf{\lambda})$ & $RPD$ \\ \hline
 		1 & 0 & 0 & 0.001 & 0.001 & 0.001 & 0.1 & full & 1347.840 & 2.163\\
 		2 & 10 & 10 & 0.763 & 0.930 & 0.989 & 0.416 & partial & 448.816 & 0.054 \\
 		3 & 8 & 8 & 0.763 & 0.334 & 0.989 & 0.416 & partial & 473.827 &  0.112\\
 		... & ~ & ~ & ~ & ~ & ~ & ~ & ~ & ~ & ~ \\
-		30 & 0 & 10 & 0.001 & 0.639 & 0.001 & 0.5 & partial & 466.423 & 0.095\\
+		30 & 0 & 10 & 0.001 & 0.639 & 0.001 & 0.5 & partial & 466.423 & 0.095\\ \hline
 	\end{tabular}
 \end{table}
 
@@ -450,7 +454,7 @@ The second part focuses on the differences (and similarities) between the optima
 \begin{equation}
 	\hat{f}_S (\mathbf{\Lambda}_S) = \mathbb{E}_{\mathbf{\Lambda}_C} \left[ f(\mathbf{\Lambda}_S,\mathbf{\Lambda}_C)\right] = \int \hat{f}(\mathbf{\Lambda}_S,\mathbf{\Lambda}_C) P(\mathbf{\Lambda}_C) d\mathbf{\Lambda}_S
 \end{equation}
-where $\hat{f}(\mathbf{\Lambda}_S,\mathbf{\Lambda}_C)$ is the response function of the model for the given hyperparameters. This is done computationally by fixing the parameters $\mathbf{\Lambda}_S$ at regular intervals and then averaging the objective value over a number of random samples. However, since the surrogate model is already an approximation of the actual objective function (i.e. the \gls{hsppbo} algorithm), and the sampling process consists of 250 random points, the resulting partial dependence model is only a rough estimate. Nevertheless, it provides insight into the hyperparameter correlations and influences \cite{friedman2001greedy}.
+where $\hat{f}(\mathbf{\Lambda}_S,\mathbf{\Lambda}_C)$ is the response function of the model for the given hyperparameters. This is done computationally by fixing the parameters $\mathbf{\Lambda}_S$ at regular intervals and then averaging the objective value over a number of random samples. In brief, this can be understood as averaging out the influence of the other parameters. However, since the surrogate model is already an approximation of the actual objective function (i.e. the \gls{hsppbo} algorithm), and the sampling process consists of 250 random points, the resulting partial dependence model is only a rough estimate. Nevertheless, it provides insight into the hyperparameter correlations and influences \cite{friedman2001greedy}.
 
 Another aspect evaluated during this part of the analysis is the feature importance. Given that we chose one of the two regression tree-based surrogate models (\gls{et} or \gls{gbrt}), we can use the underlying \texttt{scikit-learn} library to obtain the feature importance. For both methods, this was realized by calculating the \gls{mdi}, which defines the importance of each parameter by counting how often it was used to split a node in the decision tree, weighted by the resulting samples left on the branches. However, this procedure overestimates high cardinality parameters, i.e. parameters with many unique values, which is considered in the later discussion \cite{strobl2007bias}.
 

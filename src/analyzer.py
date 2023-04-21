@@ -151,7 +151,7 @@ class Analyzer:
 
         fig.show()
 
-    def create_param_boxplot(self, result_nums: list[int], cmp='optimizer', paths_dict=None):
+    def create_param_boxplot(self, result_nums: list[int], cmp='optimizer', paths_dict=None, export_values=False):
         """
         Create a boxplot over the best parameter sets found during during the optimization process (here alpha, beta, the three weight and the detection threshold).
         Also, the mode of comparison can be changed, so different optimizers, problems or dynamics can be compared.
@@ -189,7 +189,7 @@ class Analyzer:
                 res['cmp'] = key
                 results = pd.concat(
                     [results, res], ignore_index=True, sort=False)
-        print(results)
+
         y1 = ["alpha", "beta"]
         y2 = ['w_pers_best', 'w_pers_prev', 'w_parent_best']
         if 'detection_threshold' in results.columns:
@@ -210,11 +210,24 @@ class Analyzer:
 
         fig.update_layout(legend_title_text=cmp,
                           boxmode='group' if cmp else None)
+
+        if cmp:
+            if cmp == 'dynamic':
+                fig.update_layout(legend_title_text='Dynamic intensity C')
+            elif cmp == 'problem':
+                fig.update_layout(legend_title_text='Problem instance')
+
+            txt = (
+                f'Boxplot of best parameter sets (comparison of {cmp} from run {result_nums[0]} to {result_nums[-1]})')
+        else:
+            fig.update_traces(width=1/3)
+            txt = (
+                f'Boxplot of best parameter sets (run {result_nums[0]} to {result_nums[-1]})')
+
         fig.update_layout(boxgroupgap=0.2, boxgap=0.2)
         fig.update_layout(
             title={
-                'text': 'Boxplot of best parameter sets (%s comparison over runs [%d,%d])' %
-                (cmp, result_nums[0], result_nums[-1]),
+                'text': txt,
                 'y': 0.95,
                 'x': 0.5,
                 'xanchor': 'center',
@@ -222,10 +235,16 @@ class Analyzer:
         )
 
         if self.output_path:
-            fig.update_layout(title=None,margin=dict(l=0, r=0, t=0, b=0))
-            fig.write_image("/".join([self.output_path, 'param_boxplot_%s_runs_%d_to_%d.svg' %
-                                      (cmp, result_nums[0], result_nums[-1])]),
-                            format="svg", width=650, height=425)
+            fig.update_layout(title=None, font_family="Helvetica",
+                              font_size=13, margin=dict(l=0, r=0, t=0, b=0))
+            fig.write_image("/".join([self.output_path, f'parameter_boxplot_{cmp}.svg']),
+                            format="svg", width=650 if cmp else 500, height=450)
+            if export_values:
+                if cmp:
+                    results = results.groupby('cmp')
+                with open("/".join([self.output_path, f'parameter_boxplot_stats_{cmp}_{result_nums[0]}_to_{result_nums[-1]}.csv']), 'w') as out:
+                    out.write(results.quantile([0,0.25,0.5,0.75,1]).to_csv())
+                
         else:
             fig.show()
 
@@ -272,12 +291,26 @@ class Analyzer:
         if 'detection_threshold' in results.columns:
             y.append('detection_threshold')
 
+        if cmp == 'dynamic':
+            results['cmp'] = results['cmp'].astype(str)
+
         fig = px.scatter_matrix(results,
                                 dimensions=y,
                                 color="cmp" if cmp else None)
         fig.update_traces(diagonal_visible=False, showupperhalf=False)
-        fig.update_layout(legend_title_text=cmp)
+
         if cmp:
+            fig.update_layout(legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="right",
+                x=0.99
+            ))
+            if cmp == 'dynamic':
+                fig.update_layout(legend_title_text='Dynamic intensity C')
+            elif cmp == 'problem':
+                fig.update_layout(legend_title_text='Problem instance')
+
             txt = ('Scatter matrix of best parameter sets (%s comparison over runs {%s})' %
                    (cmp, ",".join(str(x) for x in result_nums)))
         else:
@@ -291,14 +324,79 @@ class Analyzer:
                 'xanchor': 'center',
                 'yanchor': 'top'}
         )
-        
+
         if self.output_path:
-            fig.update_layout(title=None,margin=dict(l=0, r=0, t=0, b=0))
-            fig.write_image("/".join([self.output_path, 'param_scatter_matrix_%s_runs_%d_to_%d.svg' %
-                                      (cmp, result_nums[0], result_nums[-1])]),
-                            format="svg", width=950, height=650)
+            fig.update_layout(title=None, font_family="Helvetica",
+                              margin=dict(l=0, r=0, t=0, b=0))
+            fig.write_image("/".join([self.output_path, f'param_scatter_matrix_{cmp}.svg']),
+                            format="svg", width=650, height=650)
         else:
-          fig.show()  
+            fig.show()
+
+    def create_param_importance_plot(self, result_nums: list[int], cmp=None):
+        results = pd.DataFrame()
+        for n in result_nums:
+            folder = self.load_result_folder(n)
+            res = pd.DataFrame.from_dict(self.get_feature_importance(n))
+            info = get_info(folder['info.json'])
+            key = get_key_parameter(cmp, info)
+            res['cmp'] = key
+            results = pd.concat([results, res], sort=False)
+
+        if cmp:
+            mean = results.groupby('cmp', sort=False).mean().T
+            error = results.groupby('cmp', sort=False).sem().T
+
+            fig = go.Figure()
+            for col in mean.columns:
+                fig.add_trace(go.Bar(
+                    name=col,
+                    y=mean[col].index,
+                    x=mean[col],
+                    error_x=dict(type='data', array=[
+                                 *error[col].to_dict().values()]),
+                    orientation='h'
+                ))
+
+            fig.update_yaxes(autorange="reversed")
+
+            txt = (
+                f'Parameter Importance (compared by {cmp}, averaged over runs {result_nums[0]} to {result_nums[-1]})')
+            fig.update_layout(barmode='group')
+
+            if cmp == 'dynamic':
+                fig.update_layout(legend_title_text='Dynamic intensity C')
+            elif cmp == 'problem':
+                fig.update_layout(legend_title_text='Problem instance')
+        else:
+            mean_results = pd.concat([results.mean(axis=0), results.sem(
+                axis=0)], axis=1, keys=['value', 'error'])
+            fig = px.bar(mean_results, x='value',
+                         error_x='error', orientation='h')
+            fig.update_traces(width=1)
+            txt = (
+                f'Parameter Importance (averaged over runs {result_nums[0]} to {result_nums[-1]})')
+
+        if self.output_path:
+            fig.update_layout(
+                font_family="Helvetica",
+                font_size=14,
+                yaxis_title="Parameter",
+                xaxis_title="Relative Importance (MDI)",
+            )
+            fig.update_layout(margin={'l': 0, 'r': 0, 't': 0, 'b': 0})
+            fig.write_image("/".join([self.output_path, f'parameter_importance_bar_{cmp}.svg']),
+                            format="svg", width=700 if cmp else 600, height=650 if cmp else 300)
+        else:
+            fig.update_layout(
+                title={
+                    'text': txt,
+                    'y': 0.9,
+                    'x': 0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top'}
+            )
+            fig.show()
 
     def create_convergence_plot(self, result_nums: list[int], paths_dict=None):
         """
@@ -370,7 +468,7 @@ class Analyzer:
             else:
                 plt.show()
 
-    def create_partial_dep_plot(self, result_num: int, paths_dict=None, n_points=40):
+    def create_partial_dep_plot(self, result_num: int, paths_dict=None, best_only=True, n_points=40):
         """
         Plot a 2-d matrix with so-called Partial Dependence plots of the objective function. 
         This shows the influence of each search-space dimension on the objective function.
@@ -416,13 +514,26 @@ class Analyzer:
         if 'reaction_type' in dimensions:
             dimensions.remove('reaction_type')
 
-        for i, res in enumerate(results[:1]):
-            plot_objective(res, dimensions=dimensions, plot_dims=[
+        index = self.get_best_param_set(result_num)[0]
+
+        if best_only:
+            plot_objective(results[index], dimensions=dimensions, plot_dims=[
                            0, 1, 2, 3, 4, 5], n_points=n_points)
             plt.suptitle('Partial Dependence (opt_%d, %s, %s [C=%.2f], run %d of %d)' %
-                         (result_num, opt, problem, dynamic_intensity, i+1, len(results)))
+                         (result_num, opt, problem, dynamic_intensity, index+1, len(results)))
+        else:
+            for i, res in enumerate(results):
+                plot_objective(res, dimensions=dimensions, plot_dims=[
+                    0, 1, 2, 3, 4, 5], n_points=n_points)
+                plt.suptitle('Partial Dependence (opt_%d, %s, %s [C=%.2f], run %d of %d)' %
+                             (result_num, opt, problem, dynamic_intensity, i+1, len(results)))
 
-        plt.show()
+        if self.output_path:
+            plt.suptitle(None)
+            plt.savefig(
+                "/".join([self.output_path, f'partial_dependence_{problem}_C_{dynamic_intensity}_run_{index+1}.svg']), dpi=300)
+        else:
+            plt.show()
 
     def get_feature_importance(self, result_num: int, paths_dict=None) -> list[dict]:
         """
@@ -586,7 +697,7 @@ class Analyzer:
             fig.update_layout(margin={'l': 0, 'r': 0, 't': 0, 'b': 0})
             fig.update_annotations(font_size=15)
             fig.write_image("/".join([self.output_path, 'convergence_stats_boxplot.svg']),
-                                format="svg", width=650, height=250)
+                            format="svg", width=650, height=250)
         else:
             fig = make_subplots(shared_xaxes=True,
                                 rows=2, cols=1, vertical_spacing=0.05,
@@ -614,7 +725,7 @@ class Analyzer:
         path_obj = Path(path)
         if path_obj.exists():
             files = {}
-            for p in path_obj.iterdir():
+            for p in sorted(path_obj.iterdir()):
                 if p.name == 'folder_info.json':
                     files['sub'] = True
                 if p.is_dir():
@@ -622,16 +733,122 @@ class Analyzer:
                                      for x in Path(p.as_posix()).iterdir()}
                 elif p.is_file():
                     files[p.name] = p.as_posix()
-
             return files
         return None
 
-    def get_best_param_set(self, result_num: int) -> list[int, list]:
+    def get_best_param_set(self, result_num: int) -> list[int, str, float, dict]:
+        """
+        Return the best param set found across all optimizer runs given the result number of a results folder.
+
+        Args:
+            result_num (int): Folder suffix to load, e.g. 5 for opt_5
+
+        Returns:
+            list[int, str, float, dict]: List of metrics for the best optimizer run: the iteration, instance name, dynamic intensity, and a dict of the specific parameters
+        """
         folder = self.load_result_folder(result_num)
         params = load_opt_best_params(folder['opt_best_params.csv'], True)
         info = get_info(folder['info.json'])
-        best_params = params.iloc[params['func_val'].idxmin()]
-        return (info['problem']['name'], info['problem']['dynamic_props']['dynamic_intensity'], best_params.to_dict())
+        index = params['func_val'].idxmin()
+        best_params = params.iloc[index]
+        return (index, info['problem']['name'], info['problem']['dynamic_props']['dynamic_intensity'], best_params.to_dict())
+
+    def get_best_param_cli(self, result_num: int) -> str:
+        """
+        Returns a command line interface version of the best parameter set found for a specific optimizer run, to use for the main.py CLI.
+
+        Args:
+            result_num (int): Folder suffix to load, e.g. 5 for opt_5
+
+        Returns:
+            str: CLI string for the main.py inputs
+        """
+        iteration, instance, dynamic_intensity, params = self.get_best_param_set(
+            result_num)
+        return f"-p {instance} -di {dynamic_intensity} -a {params['alpha']} -b {params['beta']} -plb {params['w_pers_best']:.3f} -ppr {params['w_pers_prev']:.3f} -ptb {params['w_parent_best']:.3f} -ddt {params['detection_threshold']:.3f} -r '{params['reaction_type']}'"
+
+    def create_best_param_csv(self, result_nums: list[int]) -> None:
+        """
+        Saves a csv of the best parameter set found for a specific optimizer run.
+
+        Args:
+            result_num (int): Folder suffix to load, e.g. 5 for opt_5
+        """
+        csv = 'TSP,C,alpha,beta,w_pers_best,w_pers_prev,w_parent_best,detection_threshold,reaction_type\n'
+        for i in result_nums:
+            iteration, instance, dynamic_intensity, params = self.get_best_param_set(
+                i)
+            csv += ",".join([instance, str(dynamic_intensity),
+                            *(list(map(str, params.values()))[:-1])])
+            csv += '\n'
+
+        with open("/".join([self.output_path, f'best_params_{result_nums[0]}_to_{result_nums[-1]}.csv']), 'w') as out:
+            out.write(csv)
+
+    def create_categorical_analysis_csv(self, result_nums: list[int]) -> None:
+        results = pd.DataFrame()
+        for n in result_nums:
+            folder = self.load_result_folder(n)
+            res = load_opt_best_params(
+                folder['opt_best_params.csv'], func_val=True)
+            info = get_info(folder['info.json'])
+            res['dynamic'] = get_key_parameter('dynamic', info)
+            res['problem'] = get_key_parameter('problem', info)
+
+            opt_solution = get_optimal_solution(folder['info.json'])
+            res['func_val'] = res['func_val'].apply(
+                lambda x: (x-opt_solution)/opt_solution)
+
+            results = pd.concat(
+                [results, res], ignore_index=True, sort=False)
+
+        csv = results['reaction_type'].value_counts(normalize=True).rename('all').to_frame().T
+
+        res_dynamic = results.groupby('dynamic')
+        temp = res_dynamic['reaction_type'].value_counts(normalize=True)
+        csv = pd.concat([csv, pd.concat({'dynamic_100': temp.unstack(level=1)})])
+
+        for index, median in res_dynamic['func_val'].quantile(q=0.5).items():
+            df = res_dynamic.get_group(index)
+            temp = df[df['func_val'] > median]['reaction_type'].value_counts(normalize=True)
+            temp = temp.reindex(['partial','full'])
+            temp.name = '(dynamic_50, '+str(index)+')'
+            csv = csv.append(temp)
+
+        res_problem = results.groupby('problem')
+        temp = res_problem['reaction_type'].value_counts(normalize=True)
+        csv = pd.concat([csv, pd.concat({'problem_100': temp.unstack(level=1)})])
+
+        for index, median in res_problem['func_val'].quantile(q=0.5).items():
+            df = res_problem.get_group(index)
+            temp = df[df['func_val'] > median]['reaction_type'].value_counts(normalize=True)
+            temp = temp.reindex(['partial','full'])
+            temp.name = '(problem_50, '+str(index)+')'
+            csv = csv.append(temp)
+
+        with open("/".join([self.output_path, f'categorical_eval_{result_nums[0]}_to_{result_nums[-1]}.csv']), 'w') as out:
+            out.write(csv.to_csv())
+        
+
+    def create_parameter_importance_csv(self, result_nums: list[int]) -> None:
+        """
+        Saves a csv of the parameter importance averaged over all provided results.
+        Only possible for sklearn surrogate models, which provide this information.
+
+        Args:
+            result_num (int): Folder suffix to load, e.g. 5 for opt_5
+        """
+        results = pd.DataFrame()
+        for n in result_nums:
+            results = pd.concat([results, pd.DataFrame.from_dict(
+                self.get_feature_importance(n))], sort=False)
+        mean_results = pd.concat(
+            [results.mean(axis=0), results.sem(axis=0)],
+            axis=1, keys=['value', 'error']
+        )
+
+        with open("/".join([self.output_path, f'parameter_importance_{result_nums[0]}_to_{result_nums[-1]}.csv']), 'w') as out:
+            out.write(mean_results.to_csv())
 
     def create_file_wrapper(self, result_num: int, filename: str, mode='a') -> None:
         """

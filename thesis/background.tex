@@ -21,7 +21,7 @@ Applications for the solutions are numerous, from the apparent routing of travel
 The problem description of the symmetric \gls{tsp}  can best be modeled by an undirected weighted graph $G = (V,E)$, with a set of $n$ vertices $V = \left\lbrace v_1, ... v_n\right\rbrace $ and a set of edges $E = \left\lbrace (v_i,v_j) | v_i,v_j \in V, i \neq j\right\rbrace $. Staying in the traveling salesperson analogy, the vertices are often being referred to as \enquote{cities}, while the edges between vertices represent the distance. This can be expressed by a distance function $d : V^2 \rightarrow \mathbb{R}_{0}^{+}$, which, in the case of Euclidean TSP, is just the Eucledian distance between two points in a two dimensional space.  Each city can only be visited once and since its symmetric, it does not matter which direction the abstract salesperson travels. The problem is to find the shortest (meaning smallest total distance) tour that visits each city exactly once, starting and ending at the same city. The solution resembles a permutation of $V$, written as $\textbf{s} = (s_1,...,s_n) \in V^n$, that minimizes the sum over its distances resulting in a solution quality function over $s$
 \begin{equation}
 	\label{eq:solution_quality}
-	f(s) = \sum_{i=1}^{n} d(s_i,s_{i+1}) 
+	f(s) = L = \sum_{i=1}^{n} d(s_i,s_{i+1})
 \end{equation}
 with the city node $s_{i+1}$ coming after $s_i$ and $s_{n+1} = s_1$ to complete the full tour.
 For a more precise problem description, the following applies: 
@@ -374,7 +374,7 @@ The following description of the algorithm and equations are adapted to fit the 
 		\State $\text{swapNum} \gets  \text{swapNum} + 1$
 		\EndIf
 		\EndFor
-		\If{$\text{swapNum} > [\theta \cdot \abs{\mathcal{A}}]$ $\mathbf{and}$ no change in $L$ previous iterations}
+		\If{$\text{swapNum} > [\theta \cdot \abs{\mathcal{A}}]$ $\mathbf{and}$ no change in $L_\text{pause}$ previous iterations}
 		\State \Call{ChangeHandlingProcedure}{$H$}
 		\EndIf
 		\Until{termination criterion met}
@@ -415,7 +415,7 @@ Since the \gls{hsppbo} should also detect and react to dynamic changes in the \g
 	\item $H_\text{partial}$ resets only the $P^{A}_{\text{persbest}}$ population of the \glspl{sce} starting from the third level down, leaving the the root and its children unaltered.
 \end{itemize}
 
-Whereas $H_\text{full}$ can be understood as a complete reset of the algorithm, $H_\text{partial}$ tries to apply some of the best \enquote{knowledge} to solve this changed problem (exploitation), while the lower performing \glspl{sce} may instead concentrate on finding new solutions (exploration). Additionally, due to the possibly major rearrangements in the tree as a result to these change handling procedures being executed, the parameter $L > 0$ acts as a guardrail to prevent the procedure from virtually triggering itself, providing the hierarchy some iterations to settle \cite{kupfer2021hierarchical}.
+Whereas $H_\text{full}$ can be understood as a complete reset of the algorithm, $H_\text{partial}$ tries to apply some of the best \enquote{knowledge} to solve this changed problem (exploitation), while the lower performing \glspl{sce} may instead concentrate on finding new solutions (exploration). Additionally, due to the possibly major rearrangements in the tree as a result to these change handling procedures being executed, the parameter $L_\text{pause} > 0$ acts as a guardrail to prevent the procedure from virtually triggering itself, providing the hierarchy some iterations to settle \cite{kupfer2021hierarchical}.
 
 \begin{figure}
 \centering
@@ -737,7 +737,7 @@ The derivative of this equation can be understood as gradient $g_{ij}$ to the lo
 \begin{equation}
 	h_j \approx -\operatorname*{argmin}_{h} \sum_{i=1}^{n} (h(\mathbf{\lambda}_i) - g_{ij})^2
 \end{equation}
-Given a typical squared error loss function $L(f, \hat{f}) = \frac{1}{2}(f - \hat{f})^2$, the negative gradient can be simplified to an ordinary residual $r_{ij} = -g_{ij} = y_i - \hat{f}_{j-1}(\mathbf{\lambda}_i)$ \cite[Chapter~10]{hastie2009elements}.
+Given a typical squared error loss function $\mathcal{L}(f, \hat{f}) = \frac{1}{2}(f - \hat{f})^2$, the negative gradient can be simplified to an ordinary residual $r_{ij} = -g_{ij} = y_i - \hat{f}_{j-1}(\mathbf{\lambda}_i)$ \cite[Chapter~10]{hastie2009elements}.
 
 Lastly, \cref{alg:gbrt} describes the high-level implementation of \gls{gbrt} using a squared loss function and a decision tree building process, as described with \gls{rf} in \cref{chap:rf}, using a continuous update for the residuals ($r_{i} \gets r_{ij}$, for current iteration $j$) \cite{mohan2011web}.
 Although this algorithm uses a constant initialization for the residuals, other methods could be used as well.
