@@ -63,7 +63,7 @@ class Analyzer:
         io_file.write(json.dumps(results, indent=4, default=str))
         io_file.close()
 
-    def create_run_plot(self, result_nums: list[int], cmp='dynamic', aggr='problem', iteration_range=[1950, 2300], paths_dict=None):
+    def create_run_plot(self, result_nums: list[int], y_value='best_solution', cmp='dynamic', aggr='problem', iteration_range=[1950, 2300], paths_dict=None):
         """
         Create a line plot over the quality of the current best solution over custom iteration range.
         Also, the mode of comparison and aggregation can be changed, so different optimizers, problems or dynamics can be compared and viewed in subplots.
@@ -98,7 +98,7 @@ class Analyzer:
                 res = load_run(folder['run.csv'])
             elif self.mode == self.MODE_EXPERIMENT:
                 res = load_avg_run(folder['avg_run.pkl'])
-                res['best_solution'] = res['best_solution'].apply(np.mean)
+                res[y_value] = res[y_value].apply(np.mean)
             else:
                 raise NotImplementedError(
                     "The mode %s currently does not support a run plot." % self.mode)
@@ -106,7 +106,7 @@ class Analyzer:
             info = get_info(folder['info.json'])
             res['cmp'] = get_key_parameter(cmp, info)
             opt_solution = get_optimal_solution(folder['info.json'])
-            if opt_solution:
+            if opt_solution and y_value == 'best_solution':
                 res['best_solution'] = res['best_solution'].subtract(
                     opt_solution).divide(opt_solution)
             # append or create list for current aggregation key
@@ -116,24 +116,30 @@ class Analyzer:
             else:
                 results.setdefault(get_key_parameter(
                     aggr, info), []).append(res)
-
+                
+        keyorder = ['eil51','berlin52','pr136','pr226','d198','rat195','gil262','lin318','pr439','fl417']
+        {k: results[k] for k in keyorder if k in results}
+        
         fig = make_subplots(shared_xaxes=True, vertical_spacing=0.05,
                             rows=len(results), cols=1,
                             subplot_titles=(list(results.keys())))
         count = 1
         for res in results.values():
-            res = pd.concat([r for r in res], ignore_index=True, sort=False)
-            res = res.loc[(res['iteration'] < iteration_range[1]) &
-                          (res['iteration'] >= iteration_range[0])]
-            fe = px.line(res, x="iteration", y="best_solution", color="cmp" if cmp else None,
-                         category_orders={"cmp": sorted(res['cmp'].unique())})
-            for f in fe['data']:
-                fig.add_trace(go.Scatter(f, showlegend=True if count == 1 else False,
-                              legendgroup='group'), row=count, col=1)
+            for r in res:
+                r = r.loc[(r['iteration'] < iteration_range[1]) &
+                          (r['iteration'] >= iteration_range[0])]
+                fig.add_trace(go.Scatter(x=r['iteration'], y=r[y_value], name=r['cmp'].unique()[0],
+                                         showlegend=True if count == 1 else False), row=count, col=1)
             count += 1
 
+        if cmp:
+            if cmp == 'dynamic':
+                fig.update_layout(legend_title_text='Dynamic intensity C')
+            elif cmp == 'problem':
+                fig.update_layout(legend_title_text='Problem instance')
+
         fig.update_annotations(font_size=14)
-        fig.update_layout(legend_title_text=cmp, font_size=11, boxmode='group')
+        fig.update_layout(font_size=11, boxmode='group')
         fig.update_layout(
             title={
                 'text': 'Quality of current best solution over iterations, shown for different %ss<br>(%s comparison over runs {%s})' %
@@ -243,8 +249,9 @@ class Analyzer:
                 if cmp:
                     results = results.groupby('cmp')
                 with open("/".join([self.output_path, f'parameter_boxplot_stats_{cmp}_{result_nums[0]}_to_{result_nums[-1]}.csv']), 'w') as out:
-                    out.write(results.quantile([0,0.25,0.5,0.75,1]).to_csv())
-                
+                    out.write(results.quantile(
+                        [0, 0.25, 0.5, 0.75, 1]).to_csv())
+
         else:
             fig.show()
 
@@ -802,33 +809,37 @@ class Analyzer:
             results = pd.concat(
                 [results, res], ignore_index=True, sort=False)
 
-        csv = results['reaction_type'].value_counts(normalize=True).rename('all').to_frame().T
+        csv = results['reaction_type'].value_counts(
+            normalize=True).rename('all').to_frame().T
 
         res_dynamic = results.groupby('dynamic')
         temp = res_dynamic['reaction_type'].value_counts(normalize=True)
-        csv = pd.concat([csv, pd.concat({'dynamic_100': temp.unstack(level=1)})])
+        csv = pd.concat(
+            [csv, pd.concat({'dynamic_100': temp.unstack(level=1)})])
 
         for index, median in res_dynamic['func_val'].quantile(q=0.5).items():
             df = res_dynamic.get_group(index)
-            temp = df[df['func_val'] > median]['reaction_type'].value_counts(normalize=True)
-            temp = temp.reindex(['partial','full'])
+            temp = df[df['func_val'] > median]['reaction_type'].value_counts(
+                normalize=True)
+            temp = temp.reindex(['partial', 'full'])
             temp.name = '(dynamic_50, '+str(index)+')'
             csv = csv.append(temp)
 
         res_problem = results.groupby('problem')
         temp = res_problem['reaction_type'].value_counts(normalize=True)
-        csv = pd.concat([csv, pd.concat({'problem_100': temp.unstack(level=1)})])
+        csv = pd.concat(
+            [csv, pd.concat({'problem_100': temp.unstack(level=1)})])
 
         for index, median in res_problem['func_val'].quantile(q=0.5).items():
             df = res_problem.get_group(index)
-            temp = df[df['func_val'] > median]['reaction_type'].value_counts(normalize=True)
-            temp = temp.reindex(['partial','full'])
+            temp = df[df['func_val'] > median]['reaction_type'].value_counts(
+                normalize=True)
+            temp = temp.reindex(['partial', 'full'])
             temp.name = '(problem_50, '+str(index)+')'
             csv = csv.append(temp)
 
         with open("/".join([self.output_path, f'categorical_eval_{result_nums[0]}_to_{result_nums[-1]}.csv']), 'w') as out:
             out.write(csv.to_csv())
-        
 
     def create_parameter_importance_csv(self, result_nums: list[int]) -> None:
         """
