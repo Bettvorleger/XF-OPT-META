@@ -21,6 +21,8 @@ from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import re
+from math import floor
 pd.options.mode.chained_assignment = None
 
 
@@ -63,21 +65,23 @@ class Analyzer:
         io_file.write(json.dumps(results, indent=4, default=str))
         io_file.close()
 
-    def create_run_plot(self, result_nums: list[int], y_value='best_solution', cmp='dynamic', aggr='problem', iteration_range=[1950, 2300], paths_dict=None):
+    def create_run_plot(self, result_nums: list[int], cmp='dynamic', aggr='problem', y_value='best_solution', y_value_range=None, iteration_range=[1990, 2399], alt_results_path=None, custom_keyorder=None, paths_dict=None):
         """
         Create a line plot over the quality of the current best solution over custom iteration range.
         Also, the mode of comparison and aggregation can be changed, so different optimizers, problems or dynamics can be compared and viewed in subplots.
 
         Args:
             result_nums (list[int]): List of the folder suffixes to be processed, e.g. [5,6] for exp_5 and exp_6.
-            cmp (str, optional): Comparison identifier to compare the results against, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'dynamic'.
+            cmp (str, optional): Comparison identifier to compare the results against, has to be ["optimizer","dynamic","problem","folder"] or None. Defaults to 'dynamic'.
             aggr (str, optional): Aggregation identifier to make subplots the results for each group, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'problem'.
+            custom_keyorder (list[str], optional): List of order in which to display the comparison parameter's plots or legend items. Defaults to None.
             paths_dict (dict, optional): Dict to provide the path of the needed data directly, instead of iterating over results. Used for recursion only. Defaults to None.
 
         Raises:
             NotImplementedError: _description_
         """
         results = {}
+        results_info = {}
 
         for n in result_nums:
 
@@ -104,7 +108,6 @@ class Analyzer:
                     "The mode %s currently does not support a run plot." % self.mode)
 
             info = get_info(folder['info.json'])
-            res['cmp'] = get_key_parameter(cmp, info)
             opt_solution = get_optimal_solution(folder['info.json'])
             if opt_solution and y_value == 'best_solution':
                 res['best_solution'] = res['best_solution'].subtract(
@@ -113,49 +116,582 @@ class Analyzer:
 
             if paths_dict:
                 return get_key_parameter(aggr, info), res
+            elif cmp == 'folder':
+                key = re.findall(r"_[^_]+$", self.results_path)[0][1:-1]
+                results.setdefault(get_key_parameter(
+                    aggr, info), {}).setdefault(key, []).append(res)
+                results_info.setdefault(get_key_parameter(
+                    aggr, info), {}).setdefault(key, []).append(info)
             else:
                 results.setdefault(get_key_parameter(
-                    aggr, info), []).append(res)
+                    aggr, info), {}).setdefault(get_key_parameter(cmp, info), []).append(res)
+                results_info.setdefault(get_key_parameter(
+                    aggr, info), {}).setdefault(get_key_parameter(cmp, info), []).append(info)
+
+        if cmp == 'folder':
+            for n in result_nums:
+                folder = self.load_result_folder(
+                    n, results_path=alt_results_path)
+                res = load_avg_run(folder['avg_run.pkl'])
+
+                res[y_value] = res[y_value].apply(np.mean)
+                info = get_info(folder['info.json'])
+
+                opt_solution = get_optimal_solution(folder['info.json'])
+                if opt_solution and y_value == 'best_solution':
+                    res['best_solution'] = res['best_solution'].subtract(
+                        opt_solution).divide(opt_solution)
+
+                key = re.findall(r"_[^_]+$", alt_results_path)[0][1:-1]
+                results.setdefault(get_key_parameter(
+                    aggr, info), {}).setdefault(key, []).append(res)
+                results_info.setdefault(get_key_parameter(
+                    aggr, info), {}).setdefault(key, []).append(info)
+
+        margin = dict(l=0, r=0, t=0, b=0)
+        height = 350
+        width = 700
+        note = f'{result_nums[0]}_to_{result_nums[-1]}'
+
+        max_y_value = 0
+        min_y_value = float('inf')
+
+        if aggr == 'problem' and custom_keyorder:
+            results = {k: results[k] for k in custom_keyorder if k in results}
+
+        if aggr and cmp:
+            sub_prefix = 'C=' if aggr == 'dynamic' else ''
+            fig = make_subplots(shared_xaxes=True, shared_yaxes=True, vertical_spacing=0.03, horizontal_spacing=0.01,
+                                rows=int(len(results)/2) if len(results) > 3 else 1, cols=2 if len(results) > 3 else 3,
+                                subplot_titles=(list(sub_prefix + str(x) for x in results.keys())))
+
+            margin = dict(l=0, r=0, t=25, b=0)
+            height = floor(len(results)/2)*150+300 if len(results) > 3 else 250
+            width = 600
+
+            if len(results) > 1:
+                fig.update_layout(legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.05,
+                    xanchor="right",
+                    x=1
+                ))
+
+            for ir, res in enumerate(results.items()):
+                for i, item in enumerate(res[1].items()):
+
+                    if len(item[1]) == 1:
+                        r = item[1][0]
+                    else:
+                        r = pd.DataFrame()
+                        r['iteration'] = item[1][0]['iteration']
+                        for it, t in enumerate(item[1]):
+                            r[it] = t[y_value]
+                        r[y_value] = r.drop('iteration', axis=1).mean(axis=1)
+
+                    r = r.loc[(r['iteration'] < iteration_range[1]) &
+                              (r['iteration'] >= iteration_range[0])]
+                    max_y_value = r[y_value].quantile(
+                        0.95) if max_y_value < r[y_value].quantile(0.95) else max_y_value
+                    min_y_value = r[y_value].min(
+                    ) if min_y_value > r[y_value].min() else min_y_value
+
+                    fig.add_trace(go.Scatter(x=r['iteration'], y=r[y_value], name=item[0], line=dict(color=px.colors.qualitative.Plotly[i]),
+                                             showlegend=True if ir == 0 else False, legendgroup=item[0]), row=floor(ir/2)+1 if len(results) > 3 else 1, col=ir % 2+1 if len(results) > 3 else ir+1)
+
+                    if len(results) <= 3:
+                        xaxis_title = ''
+                        if y_value == 'best_solution':
+                            xaxis_title='RPD'
+                        elif y_value == 'swaps':
+                            xaxis_title='Swaps'
+                        fig.update_layout(
+                            yaxis_title=xaxis_title
+                        )
+
+                    if cmp == 'dynamic' and aggr == 'problem':
+                        if y_value == 'swaps':
+                            theta = results_info[res[0]][item[0]
+                                                         ][0]['hsppbo']['detection_threshold']
+                            sce_count = results_info[res[0]
+                                                     ][item[0]][0]['tree']['num_sce_nodes']
+                            key = re.findall(
+                                r"_[^_]+$", self.results_path)[0][1:-1]
+                            fig.add_shape(
+                                type='line', line=dict(dash='dash', color=px.colors.qualitative.Plotly[i] if key == 'HPO' else 'black'),
+                                x0=iteration_range[0], x1=iteration_range[1], y0=theta*sce_count, y1=theta*sce_count, row=floor(ir/2)+1 if len(results) > 3 else 1, col=ir % 2+1 if len(results) > 3 else ir+1
+                            )
+        elif cmp:
+
+            fig = go.Figure()
+            results = dict(*results.values())
+            results_info = dict(*results_info.values())
+            width = 450
+
+            for k, v in results.items():
+                df = pd.DataFrame()
+                df['iteration'] = v[0]['iteration']
+                for i, r in enumerate(v):
+                    df[i] = r[y_value]
+                df[y_value] = df.drop('iteration', axis=1).mean(axis=1)
+
+                df = df.loc[(df['iteration'] < iteration_range[1])
+                            & (df['iteration'] >= iteration_range[0])]
+                max_y_value = df[y_value].quantile(
+                    0.95) if max_y_value < df[y_value].quantile(0.95) else max_y_value
+                min_y_value = df[y_value].min(
+                ) if min_y_value > df[y_value].min() else min_y_value
+
+                fig.add_trace(go.Scatter(x=df['iteration'], y=df[y_value], name=k,
+                                         showlegend=True))
                 
-        keyorder = ['eil51','berlin52','pr136','pr226','d198','rat195','gil262','lin318','pr439','fl417']
-        {k: results[k] for k in keyorder if k in results}
-        
-        fig = make_subplots(shared_xaxes=True, vertical_spacing=0.05,
-                            rows=len(results), cols=1,
-                            subplot_titles=(list(results.keys())))
-        count = 1
-        for res in results.values():
-            for r in res:
-                r = r.loc[(r['iteration'] < iteration_range[1]) &
-                          (r['iteration'] >= iteration_range[0])]
-                fig.add_trace(go.Scatter(x=r['iteration'], y=r[y_value], name=r['cmp'].unique()[0],
-                                         showlegend=True if count == 1 else False), row=count, col=1)
-            count += 1
+                yaxis_title = ''
+                if y_value == 'best_solution':
+                    yaxis_title='RPD'
+                elif y_value == 'swaps':
+                    yaxis_title='Swaps'
+                fig.update_layout(
+                    xaxis_title='Iteration',
+                    yaxis_title=yaxis_title
+                )
+
+                key = re.findall(r"_[^_]+$", self.results_path)[0][1:-1]
+                if y_value == 'swaps':
+                    width = 400
+                    if key != 'HPO':
+                        theta = results_info[k][0]['hsppbo']['detection_threshold']
+                        sce_count = results_info[k][0]['tree']['num_sce_nodes']
+                        fig.add_shape(type='line', line=dict(
+                            dash='dash', color='black'), x0=iteration_range[0], x1=iteration_range[1], y0=theta*sce_count, y1=theta*sce_count)
+
+            fig.update_layout(legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.05,
+                xanchor="right",
+                x=1
+            ))
+            
+        elif aggr:
+            results = {k: list(*v.values()) for k, v in results.items()}
+
+            fig = make_subplots(shared_xaxes=True, vertical_spacing=0.05,
+                                rows=len(results), cols=1,
+                                subplot_titles=(list(results.keys())))
+            for ir, res in enumerate(results.values()):
+                df = pd.DataFrame()
+                df['iteration'] = res[0]['iteration']
+                for i, r in enumerate(res):
+                    df[i] = r[y_value]
+                df[y_value] = df.drop('iteration', axis=1).mean(axis=1)
+                df = df.loc[(df['iteration'] < iteration_range[1]) &
+                            (df['iteration'] >= iteration_range[0])]
+                max_y_value = df[y_value].quantile(
+                    0.95) if max_y_value < df[y_value].quantile(0.95) else max_y_value
+                min_y_value = df[y_value].min(
+                ) if min_y_value > df[y_value].min() else min_y_value
+
+                fig.add_trace(go.Scatter(
+                    x=df['iteration'], y=df[y_value], showlegend=False, legendgroup=ir, line=dict(color=px.colors.qualitative.Plotly[0])), row=ir+1, col=1)
+        else:
+            fig = go.Figure()
+
+            results = list(*dict(*results.values()).values())
+            df = pd.DataFrame()
+            df['iteration'] = results[0]['iteration']
+            for i, r in enumerate(results):
+                df[i] = r[y_value]
+            df[y_value] = df.drop('iteration', axis=1).mean(axis=1)
+            df = r.loc[(df['iteration'] < iteration_range[1]) &
+                       (df['iteration'] >= iteration_range[0])]
+            max_y_value = df[y_value].quantile(
+                0.95) if max_y_value < df[y_value].quantile(0.95) else max_y_value
+            min_y_value = df[y_value].min(
+            ) if min_y_value > df[y_value].min() else min_y_value
+
+            fig.add_trace(go.Scatter(x=df['iteration'], y=df[y_value]))
+            
+            yaxis_title = ''
+            if y_value == 'best_solution':
+                yaxis_title='RPD'
+            elif y_value == 'swaps':
+                yaxis_title='Swaps'
+            fig.update_layout(
+                xaxis_title='Iteration',
+                yaxis_title=xaxis_title
+            )
 
         if cmp:
             if cmp == 'dynamic':
                 fig.update_layout(legend_title_text='Dynamic intensity C')
             elif cmp == 'problem':
                 fig.update_layout(legend_title_text='Problem instance')
+            elif cmp == 'folder':
+                fig.update_layout(legend_title_text='Parameter Set Group')
 
+        if 'xaxis2' in fig.layout:
+            if aggr and len(results) > 3:
+                for i in range(len(results)):
+                    fig['layout'][f'xaxis{i+1}'].update(nticks=10)
+        else:
+            fig['layout']['xaxis'].update(nticks=10)
+
+        if 'yaxis2' in fig.layout:
+            if aggr and len(results) > 3:
+                for i in range(len(results)):
+                    fig['layout'][f'yaxis{i+1}'].update(nticks=10)
+            if y_value_range:
+                for i in range(len(results)):
+                    fig['layout'][f'yaxis{i+1}'].update(
+                        range=[y_value_range[0], y_value_range[1]])
+            else:
+                for i in range(len(results)):
+                    fig['layout'][f'yaxis{i+1}'].update(
+                        range=[min_y_value*0.9, max_y_value])
+        else:
+            if aggr and len(results) > 3:
+                fig['layout']['yaxis'].update(nticks=10)
+            if y_value_range:
+                fig.update_layout(
+                    yaxis_range=[y_value_range[0], y_value_range[1]])
+            else:
+                fig.update_layout(
+                    yaxis_range=[min_y_value*0.8, max_y_value*1.1])
+
+        if aggr and len(results) > 3 and 'yaxis2' in fig.layout:
+            for i in range(len(results)):
+                fig['layout'][f'yaxis{i+1}'].update(nticks=10)
+        else:
+            fig['layout']['yaxis'].update(nticks=10)
+
+        key = re.findall(r"_[^_]+$", self.results_path)[0][1:-1]
         fig.update_annotations(font_size=14)
         fig.update_layout(font_size=11, boxmode='group')
         fig.update_layout(
             title={
-                'text': 'Quality of current best solution over iterations, shown for different %ss<br>(%s comparison over runs {%s})' %
-                (aggr, cmp, ",".join(str(x) for x in result_nums)),
+                'text': f'Quality of current best solution over iterations, shown for different {aggr}s<br>({cmp} comparison from run {result_nums[0]} to {result_nums[-1]}, {key})',
                 'y': 0.95,
                 'x': 0.5,
                 'xanchor': 'center',
                 'yanchor': 'top'}
         )
 
-        # results = pd.concat([r for r in results], ignore_index=True, sort=False)
-        # results = results.loc[(results['iteration'] < 2300) & (results['iteration'] >= 1950)]
-        # print(results)
-        # fig = px.line(results, x="iteration", y="best_solution", color='cmp')
+        if self.output_path:
+            fig.update_annotations(font_size=15)
+            fig.update_layout(title=None, font_family="Helvetica",
+                              font_size=15, margin=margin)
+            fig.write_image("/".join([self.output_path, f'run_plot_cmp_{cmp}_aggr_{aggr}_y_{y_value}_{note}_{key}.svg']),
+                            format="svg", width=width, height=height)
+        else:
+            fig.show()
 
-        fig.show()
+    def create_pr_plot(self, result_nums: list[int], cmp='dynamic', grouped=True, custom_keyorder=None):
+        """
+        Generate a precision-recall scatter-plot from the average of all experimentation runs in an exp-folder.
+        Comparable by custom parameters and either grouped in one plot or in multiple separate plots.
+
+        Args:
+            result_nums (list[int]): List of the folder suffixes to be processed, e.g. [5,6] for exp_5 and exp_6.
+            cmp (str, optional): Comparison identifier to compare the results against, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'dynamic'.
+            grouped (bool, optional): Whether or not to plot the compared parameter in the same graphic. Defaults to True.
+            custom_keyorder (list[str], optional): List of order in which to display the comparison parameter's plots or legend items. Defaults to None.
+
+        Raises:
+            NotImplementedError: Only experimentation mode supported.
+        """
+
+        results = {}
+        results_info = {}
+        for n in result_nums:
+            folder = self.load_result_folder(n)
+
+            if self.mode == self.MODE_EXPERIMENT:
+                res = load_avg_run(folder['avg_run.pkl'])
+            else:
+                raise NotImplementedError(
+                    "The mode %s currently does not support a run plot." % self.mode)
+
+            info = get_info(folder['info.json'])
+            results.setdefault(get_key_parameter(
+                cmp, info), []).append(res)
+            results_info.setdefault(get_key_parameter(
+                cmp, info), []).append(info)
+
+        stats = {}
+        for k, v in results.items():
+            stats[k] = []
+            for ir, r in enumerate(v):
+                r = r['reaction'].apply(pd.Series)
+                for col in r:
+                    positives, negatives, trigger_points = get_detection_info(
+                        results_info[k][ir])
+                    entry = calc_reset_accuracy(
+                        r[col], trigger_points, positives, negatives)
+
+                    entry['cmp'] = k
+                    stats[k].append(entry)
+
+        margin = dict(l=0, r=0, t=0, b=0)
+
+        if cmp == 'detection_threshold':
+            l = list()
+            for v in stats.values():
+                for el in v:
+                    l.append(el)
+            df = pd.DataFrame(l)
+
+            fig = go.Figure()
+            fig.add_trace(go.Histogram2d(
+                x=df['recall'], y=df['precision'], z=df['cmp'], histfunc='avg', colorscale='Viridis', xbins=dict(start=-0.1, end=1.1, size=0.1), ybins=dict(start=-0.1, end=1.1, size=0.1)))
+            fig.add_trace(go.Scatter(
+                x=df['recall'], y=df['precision'], mode='markers', showlegend=False,
+                marker=dict(
+                    symbol='circle',
+                    opacity=0.6,
+                    color='white',
+                    size=7,
+                    line=dict(width=1),
+                )
+            ))
+            fig.update_layout(
+                xaxis_title='Recall',
+                yaxis_title='Precision',
+                width=450, height=400
+            )
+            fig.add_shape(
+                type='line', line=dict(dash='dash'),
+                x0=0, x1=1, y0=1-df['n'][0]/600, y1=1-df['n'][0]/600
+            )
+            fig['layout']['xaxis'].update(range=[-0.1, 1.1])
+            fig['layout']['yaxis'].update(range=[-0.1, 1.1])
+
+        else:
+            if grouped:
+                fig = go.Figure()
+                for k, v in stats.items():
+                    df = pd.DataFrame.from_dict(v)
+                    df = df.sort_values(by=['recall'])
+                    fig.add_trace(go.Scatter(
+                        x=df['recall'], y=df['precision'], name=k, mode='markers'))
+
+                fig.add_shape(
+                    type='line', line=dict(dash='dash'),
+                    x0=0, x1=1, y0=1-df['n'][0]/600, y1=1-df['n'][0]/600
+                )
+                fig.update_layout(
+                    xaxis_title='Recall',
+                    yaxis_title='Precision',
+                    xaxis=dict(constrain='domain'),
+                    yaxis=dict(scaleanchor="x", scaleratio=1),
+                    width=450, height=425
+                )
+                fig['layout']['xaxis'].update(range=[-0.05, 1.05])
+                fig['layout']['yaxis'].update(range=[-0.05, 1.05])
+            else:
+                if cmp == 'problem' and custom_keyorder:
+                    stats = {k: stats[k]
+                             for k in custom_keyorder if k in stats}
+
+                sub_prefix = 'C=' if cmp == 'dynamic' else ''
+                fig = make_subplots(shared_xaxes=True, shared_yaxes=True, vertical_spacing=0.03, horizontal_spacing=0.01,
+                                    rows=int(len(stats)/2) if len(stats) > 3 else 1, cols=2 if len(stats) > 3 else 3,
+                                    subplot_titles=(list(sub_prefix + str(x) for x in stats.keys())))
+                for iv, v in enumerate(stats.values()):
+                    df = pd.DataFrame.from_dict(v)
+                    df = df.sort_values(by=['recall'])
+                    fig.add_shape(
+                        type='line', line=dict(dash='dash'),
+                        x0=0, x1=1, y0=1-df['n'][0]/600, y1=1-df['n'][0]/600, row=floor(iv/2)+1 if len(stats) > 3 else 1, col=iv % 2+1 if len(stats) > 3 else iv+1
+                    )
+                    fig.add_trace(go.Scatter(
+                        x=df['recall'], y=df['precision'], mode='markers', showlegend=False, legendgroup=iv, line=dict(color=px.colors.qualitative.Plotly[0])), row=floor(iv/2)+1 if len(stats) > 3 else 1, col=iv % 2+1 if len(stats) > 3 else iv+1)
+                if cmp == 'dynamic':
+                    fig.update_layout(
+                        xaxis2_title='Recall',
+                        yaxis_title='Precision',
+                        width=800, height=300,
+                    )
+                    margin = dict(l=0, r=0, t=25, b=0)
+                elif cmp == 'problem':
+                    fig.update_layout(
+                        width=400, height=1000,
+                    )
+                    margin = dict(l=0, r=0, t=25, b=0)
+                else:
+                    fig.update_layout(
+                        width=600, height=600,
+                        autosize=False,
+                    )
+                for i in range(len(stats)):
+                    fig['layout'][f'xaxis{i+1}'].update(range=[-0.05, 1.05])
+                    fig['layout'][f'yaxis{i+1}'].update(range=[-0.05, 1.05])
+
+        key = re.findall(r"_[^_]+$", self.results_path)[0][1:-1]
+        if self.output_path:
+            fig.update_annotations(font_size=15)
+            fig.update_layout(title=None, font_family="Helvetica",
+                              font_size=15, margin=margin)
+            fig.write_image("/".join([self.output_path, f'pr_curve_cmp_{cmp}_grouped_{grouped}_{key}.svg']),
+                            format="svg")
+        else:
+            fig.update_layout(
+                title={
+                    'text': f'Precision-Recall-Plot ({key})',
+                    'y': 0.95,
+                    'x': 0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top'}
+            )
+            fig.show()
+
+    def create_fp_theta_plot(self, result_nums: list[int]):
+        """
+        Generate a false-positives over theta (detection threshold) scatter-plot from the average of all experimentation runs in an exp-folder.
+        Comparable by custom parameters and either grouped in one plot or in multiple separate plots.
+
+        Args:
+            result_nums (list[int]): List of the folder suffixes to be processed, e.g. [5,6] for exp_5 and exp_6.
+        Raises:
+            NotImplementedError: Only experimentation mode supported.
+        """
+
+        results = []
+        results_info = []
+        for n in result_nums:
+            folder = self.load_result_folder(n)
+
+            if self.mode == self.MODE_EXPERIMENT:
+                res = load_avg_run(folder['avg_run.pkl'])
+            else:
+                raise NotImplementedError(
+                    "The mode %s currently does not support a run plot." % self.mode)
+
+            info = get_info(folder['info.json'])
+            results.append(res)
+            results_info.append(info)
+
+        stats = []
+        for ires, res in enumerate(results):
+            r = res['reaction'].apply(pd.Series)
+            for col in r:
+                positives, negatives, trigger_points = get_detection_info(
+                    results_info[ires])
+                entry = calc_reset_accuracy(
+                    r[col], trigger_points, positives, negatives)
+
+                entry['theta'] = results_info[ires]['hsppbo']['detection_threshold']
+                stats.append(entry)
+
+        df = pd.DataFrame(stats)
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=df['theta'], y=df['fp'], showlegend=False, mode='markers'))
+        fig.update_xaxes(
+            nticks=10
+        )
+        fig.update_yaxes(type="log")
+        fig.update_layout(
+            yaxis_title='False Positives',
+            xaxis_title='Detection Threshold',
+            width=400, height=400
+        )
+
+        key = re.findall(r"_[^_]+$", self.results_path)[0][1:-1]
+        if self.output_path:
+            fig.update_annotations(font_size=15)
+            fig.update_layout(title=None, font_family="Helvetica",
+                              font_size=15, margin=dict(l=0, r=0, t=0, b=0))
+            fig.write_image("/".join([self.output_path, f'fp_theta_plot_{key}.svg']),
+                            format="svg")
+        else:
+            fig.update_layout(
+                title={
+                    'text': f'Precision-Recall-Plot ({key})',
+                    'y': 0.95,
+                    'x': 0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top'}
+            )
+            fig.show()
+
+    def create_reset_accuracy_csv(self, result_nums: list[int], cmp='dynamic', aggr='problem', all_stats=False, custom_keyorder=None):
+        """
+        Export a csv of all statistics concerning the reset accuracy of the metaheuristic or only the F1-score, 
+        averaged over all experimentation runs and optionally compared and/or aggregated by a custom parameter.
+
+        Args:
+            result_nums (list[int]): List of the folder suffixes to be processed, e.g. [5,6] for exp_5 and exp_6.
+            cmp (str, optional): Comparison identifier to compare the results against, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'dynamic'.
+            aggr (str, optional): Aggregation identifier to make subplots the results for each group, has to be ["optimizer","dynamic","problem"] or None. Defaults to 'problem'.
+            all_stats (bool, optional): Whether to export all metrics or only the F1-score (influences table structure). Defaults to False.
+            custom_keyorder (list[str], optional): List of order in which to display the comparison parameter's plots or legend items. Defaults to None.
+
+        Raises:
+            NotImplementedError: Only experimentation mode supported.
+        """
+
+        results = {}
+        results_info = {}
+        for n in result_nums:
+            folder = self.load_result_folder(n)
+
+            if self.mode == self.MODE_EXPERIMENT:
+                res = load_avg_run(folder['avg_run.pkl'])
+            else:
+                raise NotImplementedError(
+                    "The mode %s currently does not support a run plot." % self.mode)
+
+            info = get_info(folder['info.json'])
+            results.setdefault(get_key_parameter(
+                aggr, info), {}).setdefault(get_key_parameter(cmp, info), []).append(res)
+            results_info.setdefault(get_key_parameter(
+                aggr, info), {}).setdefault(get_key_parameter(cmp, info), []).append(info)
+
+        stats = {}
+        for ak, av in results.items():
+            stats[ak] = {}
+            for k, v in av.items():
+                stats[ak][k] = {}
+                avg_stats = []
+                for ir, r in enumerate(v):
+                    r = r['reaction'].apply(pd.Series)
+                    for col in r:
+                        positives, negatives, trigger_points = get_detection_info(
+                            results_info[ak][k][ir])
+                        entry = calc_reset_accuracy(
+                            r[col], trigger_points, positives, negatives)
+
+                        if all_stats:
+                            avg_stats.append(entry)
+                        else:
+                            avg_stats.append(entry['f1'])
+                if all_stats:
+                    stats[ak][k] = pd.DataFrame(
+                        avg_stats).mean(axis=0).to_dict()
+                    avg = pd.DataFrame(avg_stats)['f1'].mean(axis=0)
+                    error = pd.DataFrame(avg_stats)['f1'].sem(axis=0)
+                    stats[ak][k]['f1'] = conv2siunitx(avg, error)
+                else:
+                    avg = pd.DataFrame(avg_stats).mean(axis=0).values[0]
+                    error = pd.DataFrame(avg_stats).sem(axis=0).values[0]
+                    stats[ak][k] = conv2siunitx(avg, error)
+
+        if aggr == 'problem' and custom_keyorder:
+            stats = {k: stats[k] for k in custom_keyorder if k in stats}
+
+        key = re.findall(r"_[^_]+$", self.results_path)[0][1:-1]
+        if all_stats:
+            reform = {(outerKey, innerKey): values for outerKey, innerDict in stats.items()
+                      for innerKey, values in innerDict.items()}
+            # print(pd.DataFrame(reform).T.style.to_latex())
+            with open("/".join([self.output_path, f'reset_accuracy_stats_{cmp}_{aggr}_{key}.csv']), 'w') as out:
+                out.write(pd.DataFrame(reform).T.to_csv())
+        else:
+            with open("/".join([self.output_path, f'reset_accuracy_f1_{cmp}_{aggr}_{key}.csv']), 'w') as out:
+                out.write(pd.DataFrame(stats).T.to_csv())
+            # print(pd.DataFrame(stats).T.style.to_latex())
 
     def create_param_boxplot(self, result_nums: list[int], cmp='optimizer', paths_dict=None, export_values=False):
         """
@@ -717,18 +1253,22 @@ class Analyzer:
             fig.update_annotations(font_size=14)
             fig.show()
 
-    def load_result_folder(self, result_num: int) -> Path:
+    def load_result_folder(self, result_num: int, results_path=None) -> Path:
         """
         Load the content of an output folder
 
         Args:
             result_num (int): Folder suffix to load, e.g. 5 for opt_5
+            results_path (str, optional): Path to an alternative results folder, other than specified in the class
 
         Returns:
             Generator[Path, None, None]: Generator provided by Pathlib to access its contents 
         """
+
+        if results_path is None:
+            results_path = self.results_path
         path = "".join(
-            [self.results_path, self.path_prefix, str(result_num), '/'])
+            [results_path, self.path_prefix, str(result_num), '/'])
         path_obj = Path(path)
         if path_obj.exists():
             files = {}
@@ -875,6 +1415,18 @@ class Analyzer:
 
 
 def load_opt_best_params(path: str, func_val=False) -> pd.DataFrame:
+    """_summary_
+
+    Args:
+        path (str): _description_
+        func_val (bool, optional): _description_. Defaults to False.
+
+    Raises:
+        FileExistsError: _description_
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     try:
         df = pd.read_csv(path, sep=';')
         if func_val:
@@ -963,6 +1515,8 @@ def get_key_parameter(cmp: str, info: dict) -> str:
         key = info['optimizer']
     elif cmp == 'dynamic':
         key = info['problem']['dynamic_props']['dynamic_intensity']
+    elif cmp == 'detection_threshold':
+        key = info['hsppbo']['detection_threshold']
     elif cmp == 'problem':
         key = info['problem']['name']
     else:
@@ -1023,6 +1577,54 @@ def create_problem_metadata(problem: Problem, metadata_filepath='../problems/met
 
     with open(metadata_filepath, "w") as outfile:
         json.dump(metadata, outfile, indent=4, default=str)
+
+
+def calc_reset_accuracy(row_data, trigger_points, positives, negatives) -> dict:
+    r_pos = row_data.iloc[trigger_points]
+    r_pos = r_pos.value_counts().to_dict()
+    true_positives = r_pos.get(True, 0)
+
+    r_neg = row_data.loc[row_data.index >= 2000]
+    r_neg = r_neg[~r_neg.index.isin(trigger_points)]
+    r_neg = r_neg.value_counts().to_dict()
+    false_positives = r_neg.get(True, 0)
+
+    fpr = false_positives / negatives
+    recall = true_positives / positives
+    try:
+        precision = true_positives / (true_positives+false_positives)
+    except ZeroDivisionError:
+        precision = 0
+
+    try:
+        f1 = 2 * (recall*precision) / (recall+precision)
+    except ZeroDivisionError:
+        f1 = 0
+
+    return {'p': positives, 'n': negatives, 'tp': true_positives, 'fp': false_positives, 'fpr': fpr, 'recall': recall, 'precision': precision, 'f1': f1}
+
+
+def get_detection_info(info: dict) -> tuple[int, int, list[int]]:
+    max_iter = info['hsppbo']['max_iteration_count']
+    min_iter = info['problem']['dynamic_props']['min_iterations_before_dynamic']+1
+    detection_pause = info['hsppbo']['detection_pause']
+    dynamic_freq = info['problem']['dynamic_props']['dynamic_frequency']
+
+    positives = int((max_iter - min_iter)/dynamic_freq)
+
+    trigger_points = []
+
+    for x in range(min_iter, max_iter):
+        if x % dynamic_freq < detection_pause:
+            trigger_points.append(x)
+
+    negatives = max_iter - min_iter - len(trigger_points)
+
+    return positives, negatives, trigger_points
+
+
+def conv2siunitx(val, err):
+    return (f'{val:.2f}({err:.2f})')
 
 
 def create_problem_cluster(metadata_filepath='../problems/metadata.json', output_filepath='../problems/', plot_cluster=False, n_clusters_kmeans=5):
