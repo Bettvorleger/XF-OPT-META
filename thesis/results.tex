@@ -409,7 +409,7 @@ Furthermore, by looking at the red stars, we can see that the \gls{hpo} process 
 	\label{fig:partial_dependence_berlin52_C_05}
 \end{figure}
 
-The second partial dependence plot shows the results for a higher dynamic intensity of $C=0.5$. 
+The second partial dependence plot, \cref{fig:partial_dependence_berlin52_C_05}, shows the results for a higher dynamic intensity of $C=0.5$. 
 The same results hold for $\alpha$ and $\beta$, but with the aforementioned lesser influence of smaller $\alpha$ values on $PD$ in the one-dimensional plot. The diagonal plot for $\beta$ also shows a less significant decrease in $PD$ between 4 and 8 than before, instead resembling more of an exponential function. The weight $w_{\text{persbest}}$ is also much less influential for the surrogate model. In fact, the diagonal plots for all three weights show that no particular value in the entire range between 0 and 1 has a significant impact on the prediction of the surrogate model, at least compared to $\beta$. This is also true for the detection threshold $\theta$. The corresponding contour plots for the weights and $\theta$ show similar edges, separating light-colored good solution areas from darker areas, as with $C=0.25$, but with less intense dark-colored spots, suggesting that more areas could result in satisfactory performance. The remaining 13 partial dependence plots show very similar results for the weights and $\theta$.
 
 In addition, compared to the previous, less dynamic representation of the partial dependence, the best observed parameters, indicated by the red stars, are less often in the areas indicated as optimal by the model, suggesting a mismatch between \gls{hpo} and the produced model. In this case, potentially more objective calls or a reduction of the parameter dimension could improve this situation. However, it is quite possible that this mismatch is only produced by the random sampling of the model prediction and is not significantly present in repeated predictions with a different random initialization.
@@ -423,7 +423,7 @@ In the previous subsection, regarding the partial dependence plots, we already d
 
 As mentioned earlier in the experimental setup chapter, the procedure for calculating the \gls{mdi} has some limitations. It has a bias towards parameters with high cardinality and therefore tends to underestimate the importance of parameters such as $H$, which has only two values. Furthermore, it can only reflect the importance resulting from the 60 objective calls during the optimizer run, i.e., it is not a statement about the importance of the entire parameter search space and, as such, of the \gls{hsppbo}. Nevertheless, the \gls{mdi} is still an indicator of what the model considered important enough to base its predictions on, which then guides the successful search for well-performing parameter sets. 
 
-\begin{table}[!ht]
+\begin{table}[h]
 	\centering
 	\caption[Relative parameter importance over all 90 optimizer runs]{The relative parameter importance (\gls{mdi}) computed via the surrogate model over all 90 optimizer runs with the standard error. }
 	\label{tab:parameter_importance}

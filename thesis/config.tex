@@ -671,7 +671,7 @@
   backend       = biber, %biber does not work with 64x versions alternative: bibtex8
   %minalphanames only works with biber backend
   sortcites     = true,
-  bibstyle      = numeric,
+  bibstyle      = ieee,
   citestyle     = numeric,
   giveninits    = true,
   useprefix     = false, %"von, van, etc." will be printed, too. See below.
@@ -685,7 +685,7 @@
   url           = true,
   doi           = true,
   isbn          = true,
-  backref       = true]{biblatex}
+  backref       = false]{biblatex}
 
 % enable more breaks at URLs. See https://tex.stackexchange.com/a/134281.
 \setcounter{biburllcpenalty}{7000}
@@ -1102,7 +1102,8 @@
   headsep=18pt,
   footskip=30pt,
   includehead,
-  includefoot
+  includefoot,
+  %bindingoffset=0.3cm
 ]{geometry}
 
 
